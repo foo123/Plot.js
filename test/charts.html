@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+<title>Plot - Chart</title>
+
+<style type="text/css">
+    body {
+        position:relative;
+        font-size:20px;
+        font-family: sans-serif;
+        background-color: #121212;
+        color:#aaa;
+        margin: 0;
+        padding:0;
+        text-align:center;
+    }
+    .wrapper {
+        position: relative;
+        display: block;
+        margin: 20px auto;
+        width: 33%;
+        min-width: 300px;
+        max-width: 1000px;
+    }
+    .container {
+        position: relative;
+        display: block;
+        margin: 0;
+        height: 0px;
+        width: 100%;
+        padding: 0;
+        padding-bottom: 100%; /* 1-1 */
+        border: 2px solid blue;
+    }
+    .input select {
+        position: relative;
+        display: inline-block;
+        padding: 12px 8px;
+        margin: 8px auto;
+    }
+    #plot {
+        position: relative;
+        display: inline-block;
+        padding: 12px 8px;
+    }
+    .--plot-tooltip {
+        box-sizing: border-box;
+        padding: 10px;
+        border: 1px dotted #121212;
+        background: rgba(255,255,255,0.8);
+        color: #121212;
+        text-align: left;
+        font-size: 11px;
+    }
+    .--plot-tooltip.--plot-hide-tooltip {
+        display: none;
+    }
+    .--plot-tooltip.--plot-show-tooltip {
+        display: block;
+    }
+</style>
+<script src="../src/Plot.js"></script>
+</head>
+<body>
+<header id="header">
+    <h1>Chart Test <span id="ver"></span></h1><br /><br />
+</header>
+
+<div class="input">
+<select id="chart">
+    <optgroup label="Chart Type">
+        <option value="vbar" selected>Bar Chart Vertical</option>
+        <option value="hbar">Bar Chart Horizontal</option>
+        <option value="line">Line Chart</option>
+    </optgroup>
+</select>
+<select id="ndata">
+    <optgroup label="#Inputs">
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="10">10</option>
+        <option value="20" selected>20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+    </optgroup>
+</select>
+<button id="plot">Plot</button>
+</div>
+
+<h2>== Html ==</h2>
+<div class="wrapper"><div id="container-html" class="container"></div></div>
+<h2>== Canvas ==</h2>
+<div class="wrapper"><div id="container-canvas" class="container"></div></div>
+<h2>== Svg ==</h2>
+<div class="wrapper"><div id="container-svg" class="container"></div></div>
+
+<script>
+//<![CDATA[
+!function(){
+    document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
+
+    var plotOptions = {
+        background: '#ffffff',
+        line: {
+            size: 1,
+            color: '#ff0000'
+        },
+        text:{
+            size: 14
+        },
+        axes: {
+                x: {
+                    color: '#000000',
+                    ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
+                },
+                y: {
+                    color: '#000000',
+                    ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
+                }
+            }
+        },
+
+        htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
+
+        canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
+
+        svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
+
+        points = null,
+        chartSelect = document.getElementById('chart'),
+        dataSelect = document.getElementById('ndata'),
+        chartType = 'vbar', n = 20, text = 'A very very long long loooong text text text text..';
+    ;
+
+    function genData( n )
+    {
+       var data = new Array(n), i;
+       for(i=0; i<n; i++) data[i] = (200*Math.random()-100)||1;
+       return data;
+    }
+
+    function plot( )
+    {
+        if ( points && points.length )
+        {
+            htmlPlot
+                .clear()
+                .chart(chartType, points)
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+            ;
+            canvasPlot
+                .clear()
+                .chart(chartType, points)
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+            ;
+            svgPlot
+                .clear()
+                .chart(chartType, points)
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+            ;
+        }
+    }
+
+    window.addEventListener('resize', Plot.Util.debounce(()=>{
+        htmlPlot.resize();
+        canvasPlot.resize();
+        svgPlot.resize();
+        plot();
+    }, 400), false);
+
+    document.getElementById('plot').addEventListener('click', ()=>{
+        chartType = chartSelect.options[chartSelect.selectedIndex].value;
+        n = parseInt(dataSelect.options[dataSelect.selectedIndex].value);
+        points = genData(n);
+        plot();
+    }, false);
+
+    // run on load
+    points = genData(n);
+    setTimeout(plot, 500);
+}();
+//]]>
+</script>
+</body>
+</html>

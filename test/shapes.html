@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+<title>Plot - Shapes, Arcs and Curves</title>
+
+<style type="text/css">
+    body {
+        position:relative;
+        font-size:20px;
+        font-family: sans-serif;
+        background-color: #121212;
+        color:#aaa;
+        margin: 0;
+        padding:0;
+        text-align:center;
+    }
+    .container {
+        position: relative;
+        display: block;
+        margin: 20px auto;
+        width: 400px;
+        height: 400px;
+        max-width: 100%;
+        border: 2px solid #fff;
+    }
+</style>
+<script src="../src/Plot.js"></script>
+</head>
+<body>
+<header id="header">
+    <h1>Shapes, Arcs and Curves Test <span id="ver"></span></h1><br /><br />
+</header>
+
+<h2>== Html ==</h2>
+<div id="container-html" class="container"></div>
+<h2>== Canvas ==</h2>
+<div id="container-canvas" class="container"></div>
+<h2>== Svg ==</h2>
+<div id="container-svg" class="container"></div>
+
+<script>
+//<![CDATA[
+!function(){
+    document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
+
+    const plotOptions = {background:'#000000'},
+
+        htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
+
+        canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
+
+        svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
+
+        // array of point x,y coords in plot space
+        knots = [{x:10,y:390},{x:140,y:200},{x:220,y:320},{x:320,y:210}]
+    ;
+
+    setTimeout(() => {
+        htmlPlot
+            .clear()
+            .line(knots, {line:{size:3, color:'#0000ff', style:'dotted'}})
+            .spline(knots, {line:{size:2, color:'#ff0000', style:'solid'}})
+            .point(knots, {point:{size:8, color:'#00ff00'}})
+            .rectangle({x:320,y:80}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {line:{size:1, color:'#00f000'}, fill:'#0000f0'})
+            .ellipse({x:250,y:100}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {line:{size:4, color:'#ffffff'}, fill:'#f00000'})
+            .arc({x:20,y:20}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,0/*largeArcFlag*/,0/*sweepFlag*/,{x:200,y:250}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+        ;
+        canvasPlot
+            .clear()
+            .line(knots, {line:{size:3, color:'#0000ff', style:'dotted'}})
+            .spline(knots, {line:{size:2, color:'#ff0000', style:'solid'}})
+            .point(knots, {point:{size:8, color:'#00ff00'}})
+            .rectangle({x:320,y:80}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {line:{size:1, color:'#00f000'}, fill:'#0000f0'})
+            .ellipse({x:250,y:100}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {line:{size:4, color:'#ffffff'}, fill:'#f00000'})
+            .arc({x:20,y:20}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,0/*largeArcFlag*/,0/*sweepFlag*/,{x:200,y:250}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+        ;
+        svgPlot
+            .clear()
+            .line(knots, {line:{size:3, color:'#0000ff', style:'dotted'}})
+            .spline(knots, {line:{size:2, color:'#ff0000', style:'solid'}})
+            .point(knots, {point:{size:8, color:'#00ff00'}})
+            .rectangle({x:320,y:80}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {line:{size:1, color:'#00f000'}, fill:'#0000f0'})
+            .ellipse({x:250,y:100}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {line:{size:4, color:'#ffffff'}, fill:'#f00000'})
+            .arc({x:20,y:20}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,0/*largeArcFlag*/,0/*sweepFlag*/,{x:200,y:250}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+        ;
+    }, 500);
+}();
+//]]>
+</script>
+</body>
+</html>

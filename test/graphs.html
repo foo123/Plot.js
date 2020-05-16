@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+<title>Plot - Function Graph</title>
+
+<style type="text/css">
+    body {
+        position:relative;
+        font-size:20px;
+        font-family: sans-serif;
+        background-color: #121212;
+        color:#aaa;
+        margin: 0;
+        padding:0;
+        text-align:center;
+    }
+    .wrapper {
+        position: relative;
+        display: block;
+        margin: 20px auto;
+        width: 33%;
+        min-width: 300px;
+        max-width: 1000px;
+    }
+    .container {
+        position: relative;
+        display: block;
+        margin: 0;
+        height: 0px;
+        width: 100%;
+        padding: 0;
+        padding-bottom: 100%; /* 1-1 */
+        border: 2px solid blue;
+    }
+    .input {
+        display: block;
+        text-align: center;
+        padding: 8px;
+    }
+    .input span {
+        color: red;
+    }
+    i {
+        font-size: 14px;
+    }
+    #f {
+        position: relative;
+        display: inline-block;
+        padding: 4px 8px;
+        width: 200px;
+        margin: 0px 4px;
+        color: blue;
+    }
+    #from,#to {
+        position: relative;
+        display: inline-block;
+        padding: 4px 8px;
+        width: 20px;
+        margin: 0px 4px;
+        color: green;
+    }
+    #plot {
+        position: relative;
+        display: inline-block;
+        padding: 4px 8px;
+    }
+    .--plot-tooltip {
+        box-sizing: border-box;
+        padding: 10px;
+        border: 1px dotted #121212;
+        background: rgba(255,255,255,0.8);
+        color: #121212;
+        text-align: left;
+        font-size: 11px;
+    }
+    .--plot-tooltip.--plot-hide-tooltip {
+        display: none;
+    }
+    .--plot-tooltip.--plot-show-tooltip {
+        display: block;
+    }
+</style>
+<script src="../src/Plot.js"></script>
+</head>
+<body>
+<header id="header">
+    <h1>Function Graph Test <span id="ver"></span></h1><br /><br />
+</header>
+
+<div class="input">
+<i>(functions are those supported by JavaScript's <code>Math</code> object)</i><br />
+<span>f(x)=</span><input type="text" id="f" value="sin(4*x)/x" /> [<input type="text" id="from" value="-3" />,<input type="text" id="to" value="3" />] <button id="plot">Plot</button></div>
+
+<h2>== Html ==</h2>
+<div class="wrapper"><div id="container-html" class="container"></div></div>
+<h2>== Canvas ==</h2>
+<div class="wrapper"><div id="container-canvas" class="container"></div></div>
+<h2>== Svg ==</h2>
+<div class="wrapper"><div id="container-svg" class="container"></div></div>
+
+<script>
+//<![CDATA[
+!function(){
+    document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
+
+    var plotOptions = {
+            background: '#ffffff',
+            line:{
+                size: 3,
+                color: '#ff0000'
+            },
+            axes: {
+                x: {
+                    color: '#000000',
+                    ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
+                },
+                y: {
+                    color: '#000000',
+                    ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
+                }
+            }
+        },
+
+        htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
+
+        canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
+
+        svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
+
+        points = null, fStr = ''
+    ;
+    function plot( reset )
+    {
+        if ( reset || !points )
+        {
+            points = null;
+            fStr = document.getElementById('f').value.trim();
+
+            const range = [parseFloat(document.getElementById('from').value), parseFloat(document.getElementById('to').value)];
+            let f = null;
+
+            try {
+                f = new Function("x", "\"use strict\";\nreturn ("+fStr.replace(/[a-zA-Z]+\(/g, m => 'Math.'+m)+")||0;");
+            } catch(e) {
+                console.error(e.toString());
+                f = null;
+            }
+            if ( ("function" === typeof f) &&
+                isFinite(range[0]) && isFinite(range[1]) )
+            {
+                 // cache plot samples to avoid recomputation time
+                points = htmlPlot.sample(f, range[0], range[1]);
+            }
+        }
+
+        if ( points && points.length )
+        {
+            htmlPlot
+                .clear()
+                .graph(points) // .graph(f, range[0], range[1]); // same
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+            ;
+            canvasPlot
+                .clear()
+                .graph(points) // .graph(f, range[0], range[1]); // same
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+            ;
+            svgPlot
+                .clear()
+                .graph(points) // .graph(f, range[0], range[1]); // same
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+            ;
+        }
+    }
+
+    document.getElementById('plot').addEventListener('click', ()=>plot(true), false);
+
+    window.addEventListener('resize', Plot.Util.debounce(()=>{
+        htmlPlot.resize();
+        canvasPlot.resize();
+        svgPlot.resize();
+        plot();
+    }, 400), false);
+
+    // run on load
+    setTimeout(plot, 500);
+}();
+//]]>
+</script>
+</body>
+</html>
