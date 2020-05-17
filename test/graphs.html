@@ -71,6 +71,7 @@
     .--plot-tooltip {
         box-sizing: border-box;
         padding: 10px;
+        margin: 0px;
         border: 1px dotted #121212;
         background: rgba(255,255,255,0.8);
         color: #121212;
@@ -108,7 +109,9 @@
     document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
 
     var plotOptions = {
-            background: '#ffffff',
+            background: {
+                color: '#ffffff'
+            },
             line:{
                 size: 3,
                 color: '#ff0000'
@@ -144,7 +147,7 @@
             let f = null;
 
             try {
-                f = new Function("x", "\"use strict\";\nreturn ("+fStr.replace(/[a-zA-Z]+\(/g, m => 'Math.'+m)+")||0;");
+                f = new Function("x", "\"use strict\";\nreturn ("+fStr.replace(/[a-zA-Z]+\(/g, m => 'Math.'+m)+");");
             } catch(e) {
                 console.error(e.toString());
                 f = null;
@@ -162,17 +165,17 @@
             htmlPlot
                 .clear()
                 .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {shape:{border:{size:0},fill:'rgba(255,255,255,0.7)'},text:{size:20}})
             ;
             canvasPlot
                 .clear()
                 .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {shape:{border:{size:0},fill:'rgba(255,255,255,0.7)'},text:{size:20}})
             ;
             svgPlot
                 .clear()
                 .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {line:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}})
+                .label({x:'right',y:'top'},{x:200,y:40}, 'f(x) = '+fStr, {shape:{border:{size:0},fill:'rgba(255,255,255,0.7)'},text:{size:20}})
             ;
         }
     }

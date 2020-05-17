@@ -197,6 +197,13 @@ function palette( n, format )
     }
     return colors;
 }
+function labels( n )
+{
+    var lbls = new Array(n), i;
+    for(i=0; i<n; i++)
+        lbls[i] = 'Entry: '+String(i+1);
+    return lbls;
+}
 function lin( x )
 {
     return x;
@@ -204,6 +211,19 @@ function lin( x )
 function log( x )
 {
     return stdMath.log10(x);
+}
+function X( pt )
+{
+    return pt.x;
+}
+function Y( pt )
+{
+    return pt.y;
+}
+function interpolate( a, b, t )
+{
+    t = t || 0;
+    return 0 > t ? a : (1 < t ? b : a+t*(b-a));
 }
 function arc( center, radius )
 {
@@ -370,9 +390,9 @@ function svgArc2canvasArc( start, radius, xAxisRotation,
 function subdividePath( f, l, r, tolerance, depth, pl, pr )
 {
     var self = this, m = (l + r) / 2,
-        left = pl || new Plot.Point(f.x(l), f.y(l)),
-        right = pr || new Plot.Point(f.x(r), f.y(r)),
-        middle = new Plot.Point(f.x(m), f.y(m))
+        left = pl || new Point(f.x(l), f.y(l)),
+        right = pr || new Point(f.x(r), f.y(r)),
+        middle = new Point(f.x(m), f.y(m))
     ;
     if ( (0 >= depth) || (middle.dist(left, right) <= tolerance) )
     {
@@ -627,15 +647,30 @@ Renderer[PROTO] = {
     }
     ,defaultOpts: function( ) {
         return {
-            backgroundColor: '#ffffff',
-            lineColor: '#000000',
-            lineSize: 1,
-            lineStyle: 'solid',
-            fill: 'none',
-            pointColor: '#000000',
-            pointSize: 4,
-            textColor: '#000000',
-            textSize: 12
+            background: {
+                color: '#ffffff'
+            },
+            text: {
+                size: 12,
+                color: '#000000'
+            },
+            point: {
+                size: 4,
+                color: '#000000'
+            },
+            line: {
+                size: 1,
+                color: '#000000',
+                style: 'solid'
+            },
+            shape: {
+                border: {
+                    size: 1,
+                    color: '#000000',
+                    style: 'solid'
+                },
+                fill: 'none'
+            }
         };
     }
     ,width: function( ) {
@@ -729,23 +764,23 @@ Renderer.handler = function( evt ) {
             {
                 if ( self.hitTarget.obj !== obj )
                 {
-                    callListener('leave', self.hitTarget.obj, self.hitTarget.pos, evt);
+                    callListener('leave', self.hitTarget.obj, pos, evt);
                     self.hitTarget = null;
                 }
                 else
                 {
-                    callListener('move', self.hitTarget.obj, self.hitTarget.pos, evt);
+                    callListener('move', self.hitTarget.obj, pos, evt);
                 }
             }
             if ( !self.hitTarget )
             {
                 self.hitTarget = {obj:obj, pos:pos};
-                callListener('enter', self.hitTarget.obj, self.hitTarget.pos, evt);
+                callListener('enter', self.hitTarget.obj, pos, evt);
             }
         }
         else if ( self.hitTarget )
         {
-            callListener('leave', self.hitTarget.obj, self.hitTarget.pos, evt);
+            callListener('leave', self.hitTarget.obj, pos, evt);
             self.hitTarget = null;
         }
     }
@@ -760,7 +795,7 @@ Renderer.Html = function HtmlRenderer( container, opts ) {
     var self = this;
     if ( !(self instanceof HtmlRenderer) ) return new HtmlRenderer(container, opts);
     self.container = container;
-    self.opts = extend(self.defaultOpts(), opts||{});
+    self.opts = extend(true, self.defaultOpts(), opts||{});
 };
 Renderer.Html[PROTO] = extend(new Renderer(), {
     constructor: Renderer.Html
@@ -783,7 +818,7 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
             self.drawLayer.style.margin = '0px';
             self.drawLayer.style.padding = '0px';
             self.drawLayer.style.border = 'none';
-            self.drawLayer.style.backgroundColor = self.opts.backgroundColor;
+            self.drawLayer.style.backgroundColor = self.opts.background.color;
             self.container.appendChild(self.drawLayer);
             self.handler = Renderer.handler.bind(self);
             self.drawLayer.addEventListener('touchstart', self.handler, false);
@@ -806,14 +841,14 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
     }
     ,background: function( background ) {
         var self = this;
-        self.opts.backgroundColor = background;
-        self.drawLayer.style.backgroundColor = self.opts.backgroundColor;
+        self.opts.background.color = background;
+        self.drawLayer.style.backgroundColor = self.opts.background.color;
         return self;
     }
     ,drawPoint: function( p, pointSize, pointColor, extra ) {
         var self = this, point = document.createElement('div');
-        pointSize = null != pointSize ? pointSize : self.opts.pointSize;
-        pointColor = String(pointColor || self.opts.pointColor).toLowerCase();
+        pointSize = null != pointSize ? pointSize : self.opts.point.size;
+        pointColor = String(pointColor || self.opts.point.color).toLowerCase();
         point.className = '--plot-point';
         point.style.position = 'absolute';
         point.style.display = 'inline-block';
@@ -838,9 +873,9 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
     ,drawLine: function( p1, p2, lineSize, lineColor, lineStyle, extra, hitId ) {
         var self = this, line = document.createElement('div'),
             dy = p2.y-p1.y, dx = p2.x-p1.x, dd = stdMath.hypot(dy, dx);
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         line.className = '--plot-line';
@@ -876,12 +911,12 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
     }
     ,drawRect: function( center, side, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, rect = document.createElement('div');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         rect.className = '--plot-rectangle';
         rect.style.position = 'absolute';
         rect.style.display = 'inline-block';
@@ -904,12 +939,12 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
     }
     ,drawEllipse: function( center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, ellipse = document.createElement('div');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ellipse.className = '--plot-ellipse';
         ellipse.style.position = 'absolute';
         ellipse.style.display = 'inline-block';
@@ -941,9 +976,9 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         a0 = params[6]; a1 = params[6]+params[7]; acw = 1-params[8];
         mat = Matrix().translate(params[0], h-params[1]).mul(Matrix().rotate(-params[2]).mul(Matrix().scale(params[3], (acw?1:-1)*params[4])));
         samples = subdividePath(arc({x:0,y:0}, {x:params[5],y:params[5]}), acw ? -a1+stdMath.PI : a0, acw ? -a0+stdMath.PI : a1, 0.1, 20).map(function(p){return mat.transform(p);});
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -959,9 +994,9 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
                 x: bezier(points.map(function(p){return p.x;})),
                 y: bezier(points.map(function(p){return p.y;}))
             }, 0, 1, 0.5, 20);
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -1013,8 +1048,8 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
     }
     ,drawText: function( p, str, textSize, textColor, maxWidth ) {
         var self = this, text = document.createElement('div');
-        textSize = textSize || self.opts.textSize;
-        textColor = String(textColor || self.opts.textColor).toLowerCase();
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
         text.className = '--plot-text';
         text.style.position = 'absolute';
         text.style.display = 'inline-block';
@@ -1048,7 +1083,7 @@ Renderer.Canvas = function CanvasRenderer( container, opts ) {
     var self = this;
     if ( !(self instanceof CanvasRenderer) ) return new CanvasRenderer(container, opts);
     self.container = container;
-    self.opts = extend(self.defaultOpts(), opts||{});
+    self.opts = extend(true, self.defaultOpts(), opts||{});
 };
 Renderer.Canvas[PROTO] = extend(new Renderer(), {
     constructor: Renderer.Canvas
@@ -1128,7 +1163,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,clear: function( ) {
         var self = this, ctx = self.drawLayer.getContext("2d");
-        ctx.fillStyle = String(self.opts.backgroundColor);
+        ctx.fillStyle = String(self.opts.background.color);
         ctx.fillRect(0, 0, self.drawLayer.width, self.drawLayer.height);
         ctx = self.hitCanvas.getContext("2d");
         ctx.clearRect(0, 0, self.hitCanvas.width, self.hitCanvas.height);
@@ -1139,13 +1174,13 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,background: function( background ) {
         var self = this;
-        self.opts.backgroundColor = background;
+        self.opts.background.color = background;
         return self;
     }
     ,drawPoint: function( p, pointSize, pointColor, extra ) {
         var self = this, c, ctx = self.drawLayer.getContext('2d');
-        pointSize = null != pointSize ? pointSize : self.opts.pointSize;
-        pointColor = String(pointColor || self.opts.pointColor).toLowerCase();
+        pointSize = null != pointSize ? pointSize : self.opts.point.size;
+        pointColor = String(pointColor || self.opts.point.color).toLowerCase();
         ctx.resetTransform();
         ctx.fillStyle = pointColor;
         ctx.beginPath();
@@ -1166,9 +1201,9 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,drawLine: function( p1, p2, lineSize, lineColor, lineStyle, extra ) {
         var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         ctx.resetTransform();
@@ -1201,12 +1236,12 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,drawRect: function( center, side, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ctx.resetTransform();
         ctx.translate(center.x, h-center.y);
         ctx.rotate((rotation||0)*stdMath.PI/180);
@@ -1260,12 +1295,12 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,drawEllipse: function( center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ctx.resetTransform();
         ctx.beginPath();
         if ( 0 < lineSize )
@@ -1314,9 +1349,9 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
                     lineSize, lineColor, lineStyle, extra
     ) {
         var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d'), params;
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         params = svgArc2canvasArc({x:start.x,y:h-start.y}, radius, xAxisRotation||0, largeArcFlag?1:0, sweepFlag?1:0, {x:end.x,y:h-end.y});
         //params = [centpX, centpY, xAxisRotation, sx, sy, rad, ang1, angd, sweepFlag];
         ctx.resetTransform();
@@ -1359,9 +1394,9 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,drawBezier: function( points, lineSize, lineColor, lineStyle, extra ) {
         var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         ctx.resetTransform();
@@ -1418,8 +1453,8 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
     }
     ,drawText: function( p, str, textSize, textColor, maxWidth ) {
         var self = this, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        textSize = textSize || self.opts.textSize;
-        textColor = String(textColor || self.opts.textColor).toLowerCase();
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
         ctx.resetTransform();
         ctx.font = String(textSize)+'px sans-serif';
         ctx.fillStyle = textColor;
@@ -1435,7 +1470,7 @@ Renderer.Svg = function SvgRenderer( container, opts ) {
     var self = this;
     if ( !(self instanceof SvgRenderer) ) return new SvgRenderer(container, opts);
     self.container = container;
-    self.opts = extend(self.defaultOpts(), opts||{});
+    self.opts = extend(true, self.defaultOpts(), opts||{});
 };
 Renderer.Svg[PROTO] = extend(new Renderer(), {
     constructor: Renderer.Svg
@@ -1459,7 +1494,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
             self.drawLayer.style.margin = '0px';
             self.drawLayer.style.padding = '0px';
             self.drawLayer.style.border = 'none';
-            self.drawLayer.style.backgroundColor = self.opts.backgroundColor;
+            self.drawLayer.style.backgroundColor = self.opts.background.color;
             self.container.appendChild(self.drawLayer);
             self.drawLayer.setAttribute('viewBox', '0 0 '+String(self.width())+' '+String(self.height()));
             self.handler = Renderer.handler.bind(self);
@@ -1491,14 +1526,14 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,background: function( background ) {
         var self = this;
-        self.opts.backgroundColor = background;
-        self.drawLayer.style.backgroundColor = self.opts.backgroundColor;
+        self.opts.background.color = background;
+        self.drawLayer.style.backgroundColor = self.opts.background.color;
         return self;
     }
     ,drawPoint: function( p, pointSize, pointColor, extra ) {
         var self = this, h = self.height(), point = document.createElementNS(self.NS,'circle');
-        pointSize = null!=pointSize ? pointSize : self.opts.pointSize;
-        pointColor = String(pointColor || self.opts.pointColor).toLowerCase();
+        pointSize = null!=pointSize ? pointSize : self.opts.point.size;
+        pointColor = String(pointColor || self.opts.point.color).toLowerCase();
         point.setAttribute('class', '--plot-point');
         point.setAttribute('cx', String(p.x));
         point.setAttribute('cy', String(h-p.y));
@@ -1513,9 +1548,9 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,drawLine: function( p1, p2, lineSize, lineColor, lineStyle, extra ) {
         var self = this, h = self.height(), line = document.createElementNS(self.NS,'line');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         line.setAttribute('class', '--plot-line');
@@ -1536,12 +1571,12 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,drawRect: function( center, side, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, h = self.height(), rect = document.createElementNS(self.NS, 'rect');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         rect.setAttribute('class', '--plot-rectangle');
         rect.setAttribute('x', String(center.x-side.x/2));
         rect.setAttribute('y', String(h-center.y-side.y/2));
@@ -1565,12 +1600,12 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,drawEllipse: function( center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
         var self = this, h = self.height(), ellipse = document.createElementNS(self.NS, 'ellipse');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
-        fill = String(null != fill ? fill : self.opts.fill).toLowerCase();
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ellipse.setAttribute('class', '--plot-ellipse');
         ellipse.setAttribute('cx', String(center.x));
         ellipse.setAttribute('cy', String(h-center.y));
@@ -1597,9 +1632,9 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
                     lineSize, lineColor, lineStyle, extra
     ) {
         var self = this, h = self.height(), path = document.createElementNS(self.NS,'path');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-arc');
@@ -1619,9 +1654,9 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,drawBezier: function( points, lineSize, lineColor, lineStyle, extra ) {
         var self = this, h = self.height(), path = document.createElementNS(self.NS,'path');
-        lineSize = null!=lineSize ? lineSize : self.opts.lineSize;
-        lineColor = String(lineColor || self.opts.lineColor).toLowerCase();
-        lineStyle = String(lineStyle || self.opts.lineStyle).toLowerCase();
+        lineSize = null!=lineSize ? lineSize : self.opts.line.size;
+        lineColor = String(lineColor || self.opts.line.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-bezier');
@@ -1676,8 +1711,8 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
     }
     ,drawText: function( p, str, textSize, textColor, maxWidth ) {
         var self = this, text, h = self.height();
-        textSize = textSize || self.opts.textSize;
-        textColor = String(textColor || self.opts.textColor).toLowerCase();
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
         text = document.createElementNS(self.NS, 'text');
         text.setAttribute('class', '--plot-text');
         text.setAttribute('x', p.x);
@@ -1727,7 +1762,9 @@ Plot[PROTO] = {
             depth: 20,
             npoints: 60,
 
-            background: '#ffffff',
+            background: {
+                color: '#ffffff'
+            },
 
             padding: {
                 top: 20,
@@ -1736,22 +1773,30 @@ Plot[PROTO] = {
                 left: 20
             },
 
-            fill: 'none',
-            line: {
-                size: 1,
-                color: '#000000',
-                style: 'solid'
+            text: {
+                size: 14,
+                color: '#000000'
             },
             point: {
                 size: 4,
                 color: '#000000'
             },
-            text: {
-                size: 14,
-                color: '#000000'
+            line: {
+                size: 1,
+                color: '#000000',
+                style: 'solid'
+            },
+            shape: {
+                border: {
+                    size: 1,
+                    color: '#000000',
+                    style: 'solid'
+                },
+                fill: 'none'
             },
 
             colors: null,
+            labels: null,
 
             axes: {
                 x: {
@@ -1790,24 +1835,6 @@ Plot[PROTO] = {
         };
     }
 
-    ,sample: function( f, x0, x1, opts ) {
-        var self = this, points, p, i, h, n;
-
-        opts = extend(clone(self.opts), opts||{});
-
-        if ( null == x0 ) x0 = 0;
-        if ( null == x1 ) x1 = x0+1;
-        f = is_callable(f.x) && is_callable(f.y) ? f : {x:lin, y:f};
-
-        n = stdMath.ceil(2*opts.npoints/3); h = (x1-x0)/n; points = [];
-        for(i=0; i<n; i++)
-        {
-            p = subdividePath(f, x0+i*h, x0+(i+1)*h, opts.tolerance, opts.depth);
-            points = points.concat(0 < i ? p.slice(1) : p); // remove duplicate point
-        }
-        return points;
-    }
-
     ,boundingBox: function( points ) {
         var i, n = points.length, minX, minY, maxX, maxY;
         if ( 'number' === typeof points[0] )
@@ -1837,6 +1864,24 @@ Plot[PROTO] = {
         }
     }
 
+    ,sample: function( f, x0, x1, opts ) {
+        var self = this, points, p, i, h, n;
+
+        opts = extend(clone(self.opts), opts||{});
+
+        if ( null == x0 ) x0 = 0;
+        if ( null == x1 ) x1 = x0+1;
+        f = is_callable(f.x) && is_callable(f.y) ? f : {x:lin, y:f};
+
+        n = stdMath.ceil(2*opts.npoints/3); h = (x1-x0)/n; points = [];
+        for(i=0; i<n; i++)
+        {
+            p = subdividePath(f, x0+i*h, x0+(i+1)*h, opts.tolerance, opts.depth);
+            points = points.concat(0 < i ? p.slice(1) : p); // remove duplicate point
+        }
+        return points;
+    }
+
     ,width: function( ) {
         return this.renderer.init().width();
     }
@@ -1852,7 +1897,7 @@ Plot[PROTO] = {
 
     ,clear: function( ) {
         var self = this;
-        self.renderer.init().background(self.opts.background).clear();
+        self.renderer.init().background(self.opts.background.color).clear();
         return self;
     }
 
@@ -1861,21 +1906,6 @@ Plot[PROTO] = {
         opts = extend(true, clone(self.opts), opts||{});
         self.renderer.init(); // lazy init
         self.renderer.drawText(pos, text, opts.text.size, opts.text.color);
-        return self;
-    }
-
-    ,label: function( pos, size, text, opts ) {
-        var self = this, i, n;
-        opts = extend(true, clone(self.opts), opts||{});
-        self.renderer.init(); // lazy init
-        if ( 'left'===pos.x ) pos.x = 0;
-        else if ( 'right'===pos.x ) pos.x = self.renderer.width()-size.x;
-        else if ( 'center'===pos.x ) pos.x = (self.renderer.width()-size.x)/2;
-        if ( 'bottom'===pos.y ) pos.y = size.y;
-        else if ( 'top'===pos.y ) pos.y = self.renderer.height();
-        else if ( 'center'===pos.y ) pos.y = (self.renderer.height()+size.y)/2;
-        self.renderer.drawRect({x:pos.x+size.x/2, y:pos.y-size.y/2}, size, 0, opts.line.size, opts.line.color, opts.line.style, opts.fill);
-        self.renderer.drawText({x:pos.x+opts.padding.left, y:pos.y-opts.padding.top}, text, opts.text.size, opts.text.color, size.x-opts.padding.right-opts.padding.left);
         return self;
     }
 
@@ -1917,13 +1947,13 @@ Plot[PROTO] = {
                 side = args[1];
                 if ( "number" === typeof side ) side = {x:side, y:side};
                 center = args[0];
-                self.renderer.drawRect(center, side, rotation||0, opts.line.size, opts.line.color, opts.line.style, opts.fill);
+                self.renderer.drawRect(center, side, rotation||0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
             });
         }
         else
         {
             opts = extend(true, clone(self.opts), opts||{});
-            self.renderer.drawRect(center, side, rotation||0, opts.line.size, opts.line.color, opts.line.style, opts.fill);
+            self.renderer.drawRect(center, side, rotation||0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
         }
         return self;
     }
@@ -1940,14 +1970,14 @@ Plot[PROTO] = {
                 radius = args[1];
                 if ( "number" === typeof radius ) radius = {x:radius, y:radius};
                 center = args[0];
-                self.renderer.drawEllipse(center, radius, rotation||0, opts.line.size, opts.line.color, opts.line.style, opts.fill);
+                self.renderer.drawEllipse(center, radius, rotation||0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
             });
         }
         else
         {
             opts = extend(true, clone(self.opts), opts||{});
             if ( "number" === typeof radius ) radius = {x:radius, y:radius};
-            self.renderer.drawEllipse(center, radius, rotation||0, opts.line.size, opts.line.color, opts.line.style, opts.fill);
+            self.renderer.drawEllipse(center, radius, rotation||0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
         }
         return self;
     }
@@ -2001,12 +2031,12 @@ Plot[PROTO] = {
         if ( !is_array(knots) ) knots = [knots];
         var self = this, i, n,
             segments = {
-                x: bezierThrough(knots.map(function(p){return p.x;})),
-                y: bezierThrough(knots.map(function(p){return p.y;}))
+                x: bezierThrough(knots.map(X)),
+                y: bezierThrough(knots.map(Y))
             }, points;
         points = segments.x.reduce(function(points, s, i){
             return s.reduce(function(points, si, j){
-                points.push(new Plot.Point(segments.x[i][j], segments.y[i][j]));
+                points.push(new Point(segments.x[i][j], segments.y[i][j]));
                 return points;
             }, points);
         }, []);
@@ -2025,6 +2055,21 @@ Plot[PROTO] = {
         return self;
     }
 
+    ,label: function( pos, size, text, opts ) {
+        var self = this, i, n;
+        opts = extend(true, clone(self.opts), opts||{});
+        self.renderer.init(); // lazy init
+        if ( 'left'===pos.x ) pos.x = 0;
+        else if ( 'right'===pos.x ) pos.x = self.renderer.width()-size.x;
+        else if ( 'center'===pos.x ) pos.x = (self.renderer.width()-size.x)/2;
+        if ( 'bottom'===pos.y ) pos.y = size.y;
+        else if ( 'top'===pos.y ) pos.y = self.renderer.height();
+        else if ( 'center'===pos.y ) pos.y = (self.renderer.height()+size.y)/2;
+        self.renderer.drawRect({x:pos.x+size.x/2, y:pos.y-size.y/2}, size, 0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
+        self.renderer.drawText({x:pos.x+opts.padding.left, y:pos.y-opts.padding.top}, text, opts.text.size, opts.text.color, size.x-opts.padding.right-opts.padding.left);
+        return self;
+    }
+
     ,graph: function( f, x0, x1, opts ) {
         var self = this, data, points, vm, vw, vh, w, h, o, s,
             padl, padr, padt, padb, boundingBox,
@@ -2035,8 +2080,8 @@ Plot[PROTO] = {
 
         opts = extend(true, clone(self.opts), opts||{});
 
-        scx = opts.axes && opts.axes.x && opts.axes.x.ticks && ('log' === opts.axes.x.ticks.scale) ? log : lin;
-        scy = opts.axes && opts.axes.y && opts.axes.y.ticks && ('log' === opts.axes.y.ticks.scale) ? log : lin;
+        scx = opts.axes && opts.axes.x && opts.axes.x.ticks && ('log' === opts.axes.x.ticks.scale) ? /*log*/lin : lin;
+        scy = opts.axes && opts.axes.y && opts.axes.y.ticks && ('log' === opts.axes.y.ticks.scale) ? /*log*/lin : lin;
 
         padl = stdMath.max(0, opts.padding ? opts.padding.left||0 : 0);
         padr = stdMath.max(0, opts.padding ? opts.padding.right||0 : 0);
@@ -2053,8 +2098,8 @@ Plot[PROTO] = {
         w = (boundingBox.max.x-boundingBox.min.x)+EPS;
         h = (boundingBox.max.y-boundingBox.min.y)+EPS;
         s = stdMath.min((vw-padl-padr)/w, (vh-padt-padb)/h);
-        vm = new Plot.Matrix().translate(-boundingBox.min.x, -boundingBox.min.y).scale(s).translate(padl+((vw-padl-padr)-s*w)/2, padb+((vh-padt-padb)-s*h)/2);
-        o = vm.transform(Point(0, 0)).apply(stdMath.round);
+        vm = new Matrix().translate(-boundingBox.min.x, -boundingBox.min.y).scale(s).translate(padl+((vw-padl-padr)-s*w)/2, padb+((vh-padt-padb)-s*h)/2);
+        o = vm.transform(new Point(0, 0)).apply(stdMath.round);
 
         if ( opts.axes )
         {
@@ -2172,8 +2217,8 @@ Plot[PROTO] = {
                 self.tooltip.classList.add('--plot-show-tooltip');
                 self.tooltip.style.left = String(coords.pageX) + 'px';
                 self.tooltip.style.top = String(coords.pageY) + 'px';
-                t = stdMath.abs(coords.x-obj.pos[0].x)/stdMath.abs(obj.pos[1].x-obj.pos[0].x);
-                self.tooltip.textContent = String(obj.extra.p1.y+t*(obj.extra.p2.y-obj.extra.p1.y));
+                t = (coords.x-obj.pos[0].x)/(obj.pos[1].x-obj.pos[0].x);
+                self.tooltip.innerHTML = 'x: '+String(interpolate(obj.extra.p1.x, obj.extra.p2.x, t))+'<br />y: '+String(interpolate(obj.extra.p1.y, obj.extra.p2.y, t));
             }
             else if ( 'leave' === type )
             {
@@ -2184,8 +2229,8 @@ Plot[PROTO] = {
             {
                 self.tooltip.style.left = String(coords.pageX) + 'px';
                 self.tooltip.style.top = String(coords.pageY) + 'px';
-                t = stdMath.abs(coords.x-obj.pos[0].x)/stdMath.abs(obj.pos[1].x-obj.pos[0].x);
-                self.tooltip.textContent = String(obj.extra.p1.y+t*(obj.extra.p2.y-obj.extra.p1.y));
+                t = (coords.x-obj.pos[0].x)/(obj.pos[1].x-obj.pos[0].x);
+                self.tooltip.innerHTML = 'x: '+String(interpolate(obj.extra.p1.x, obj.extra.p2.x, t))+'<br />y: '+String(interpolate(obj.extra.p1.y, obj.extra.p2.y, t));
             }
         };
         for(i=0,n=points.length; i+1<n; i++)
@@ -2248,6 +2293,7 @@ Plot[PROTO] = {
         opts = extend(true, clone(self.opts), opts||{});
 
         opts.colors = opts.colors || palette(data.length);
+        opts.labels = opts.labels || labels(data.length);
         padl = stdMath.max(0, opts.padding ? opts.padding.left||0 : 0);
         padr = stdMath.max(0, opts.padding ? opts.padding.right||0 : 0);
         padt = stdMath.max(0, opts.padding ? opts.padding.top||0 : 0);
@@ -2258,7 +2304,7 @@ Plot[PROTO] = {
         else
             ticks = (opts.axes && opts.axes.y ? opts.axes.y.ticks : null) || null;
 
-        points = data.map(function(y, x){return Point(x, y);});
+        points = data.map(function(y, x){return new Point(x, y);});
         boundingBox = self.boundingBox(points);
         n = points.length;
 
@@ -2295,7 +2341,7 @@ Plot[PROTO] = {
         s = (vs-pad1-pad2)/range;
         o = pad1 + s*min;
         bar2 = bar/2; //sbar = stdMath.max(1, spc*bar);
-        vm = new Plot.Matrix().scale(1, s);
+        vm = new Matrix().scale(1, s);
 
         if ( opts.axes )
         {
@@ -2349,7 +2395,7 @@ Plot[PROTO] = {
                 self.tooltip.classList.add('--plot-show-tooltip');
                 self.tooltip.style.left = String(coords.pageX) + 'px';
                 self.tooltip.style.top = String(coords.pageY) + 'px';
-                self.tooltip.textContent = obj.extra.value;
+                self.tooltip.innerHTML = obj.extra.label+'<br />'+obj.extra.value;
             }
             else if ( 'leave' === type )
             {
@@ -2376,6 +2422,7 @@ Plot[PROTO] = {
                 if ( Point.isFinite(points[i]) )
                 {
                     self.renderer.drawPoint({x:padl+ts, y:o+points[i].y}, opts.point.size, opts.colors[i], {
+                            label: opts.labels[i],
                             value: String(data[i]),
                             listener: {
                                 'enter':evtHandler,
@@ -2395,6 +2442,7 @@ Plot[PROTO] = {
                     if ( 'hbar'===type )
                     {
                         self.renderer.drawRect({y:padb+bar2+ts+(0<i?spc*ts:0), x:o+points[n-1-i].y/2}, {y:bar, x:stdMath.abs(points[n-1-i].y)}, 0, 0, 'transparent', 'solid', opts.colors[n-1-i], {
+                            label: opts.labels[n-1-i],
                             value: String(data[n-1-i]),
                             listener: {
                                 'enter':evtHandler,
@@ -2406,6 +2454,7 @@ Plot[PROTO] = {
                     else
                     {
                         self.renderer.drawRect({x:padl+bar2+ts+(0<i?spc*ts:0), y:o+points[i].y/2}, {x:bar, y:stdMath.abs(points[i].y)}, 0, 0, 'transparent', 'solid', opts.colors[i], {
+                            label: opts.labels[i],
                             value: String(data[i]),
                             listener: {
                                 'enter':evtHandler,

@@ -50,6 +50,7 @@
     .--plot-tooltip {
         box-sizing: border-box;
         padding: 10px;
+        margin: 0px;
         border: 1px dotted #121212;
         background: rgba(255,255,255,0.8);
         color: #121212;
@@ -104,7 +105,9 @@
     document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
 
     var plotOptions = {
-        background: '#ffffff',
+        background: {
+            color: '#ffffff'
+        },
         line: {
             size: 1,
             color: '#ff0000'
@@ -150,17 +153,17 @@
             htmlPlot
                 .clear()
                 .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
             ;
             canvasPlot
                 .clear()
                 .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
             ;
             svgPlot
                 .clear()
                 .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {fill:'rgba(255,255,255,0.7)'})
+                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
             ;
         }
     }
