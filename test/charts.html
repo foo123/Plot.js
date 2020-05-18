@@ -115,6 +115,14 @@
         text:{
             size: 14
         },
+        label:{
+            padding:{
+                top: 20,
+                right: 10,
+                bottom: 20,
+                left: 10
+            }
+        },
         axes: {
                 x: {
                     color: '#000000',
@@ -133,7 +141,7 @@
 
         svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
 
-        points = null,
+        data = null,
         chartSelect = document.getElementById('chart'),
         dataSelect = document.getElementById('ndata'),
         chartType = 'vbar', n = 20, text = 'A very very long long loooong text text text text..';
@@ -141,29 +149,33 @@
 
     function genData( n )
     {
-       var data = new Array(n), i;
-       for(i=0; i<n; i++) data[i] = (200*Math.random()-100)||1;
-       return data;
+       var data = new Array(n), i, labels = new Array(n);
+       for(i=0; i<n; i++)
+       {
+            data[i] = (200*Math.random()-100)||1;
+            labels[i] = 'Entry: '+String(i+1);
+        }
+       return {data:data, colors:Plot.Util.palette(n), labels:labels};
     }
 
     function plot( )
     {
-        if ( points && points.length )
+        if ( data && data.data )
         {
             htmlPlot
                 .clear()
-                .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
+                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
             ;
             canvasPlot
                 .clear()
-                .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
+                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
             ;
             svgPlot
                 .clear()
-                .chart(chartType, points)
-                .label({x:'right',y:'top'},{x:200,y:60}, text, {shape:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
+                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
             ;
         }
     }
@@ -178,12 +190,12 @@
     document.getElementById('plot').addEventListener('click', ()=>{
         chartType = chartSelect.options[chartSelect.selectedIndex].value;
         n = parseInt(dataSelect.options[dataSelect.selectedIndex].value);
-        points = genData(n);
+        data = genData(n);
         plot();
     }, false);
 
     // run on load
-    points = genData(n);
+    data = genData(n);
     setTimeout(plot, 500);
 }();
 //]]>

@@ -1,5 +1,5 @@
 /**
-*   Plot.js
+*   Plot.js, version 1.0.0
 *   Simple shape sketching and chart / functional graph plotting library which can render to Canvas, SVG and plain HTML
 *   https://github.com/foo123/Plot.js
 **/
@@ -12,7 +12,7 @@
     /* module factory */        function ModuleFactory__Plot( undef ){
 "use strict";
 
-var stdMath = Math, PROTO = 'prototype', EPS = 1e-6,
+var stdMath = Math, PROTO = 'prototype', EPS = 1e-6, SPC = /\s+/,
     HAS = Object[PROTO].hasOwnProperty, toString = Object[PROTO].toString;
 
 if ( !stdMath.hypot )
@@ -40,13 +40,17 @@ function err( msg )
         throw new Error(msg||'Error');
     };
 }
+function typeOf( x )
+{
+    return toString.call(x).slice(8, -1);
+}
 function is_array( x )
 {
-    return '[object Array]' === toString.call(x);
+    return 'Array' === typeOf(x);
 }
 function is_obj( x )
 {
-    return '[object Object]' === toString.call(x);
+    return 'Object' === typeOf(x);
 }
 function is_callable( x )
 {
@@ -220,10 +224,18 @@ function Y( pt )
 {
     return pt.y;
 }
-function interpolate( a, b, t )
+function YH( height )
+{
+    return function( pt ) {
+        if ( "number" === typeof pt ) return height-pt;
+        pt.y = height-pt.y;
+        return pt;
+    };
+}
+function interpolate( a, b, t, extended )
 {
     t = t || 0;
-    return 0 > t ? a : (1 < t ? b : a+t*(b-a));
+    return true===extended ? (a + t*(b-a)) : (0 > t ? a : (1 < t ? b : (a + t*(b-a))));
 }
 function arc( center, radius )
 {
@@ -345,7 +357,7 @@ function svgArc2canvasArc( start, radius, xAxisRotation,
     // lastX and lastY are the previous point on the path before the arc
     //--------------------
 
-    xAxisRotation = xAxisRotation*Math.PI/180;
+    xAxisRotation = xAxisRotation*stdMath.PI/180;
     var sax = stdMath.sin(xAxisRotation), cax = stdMath.cos(xAxisRotation),
         currpX = (cax*(start.x-end.x)+sax*(start.y-end.y))/2.0,
         currpY = (-sax*(start.x-end.x)+cax*(start.y-end.y))/2.0,
@@ -503,8 +515,8 @@ Point[PROTO] = {
         return fx instanceof Matrix ? fx.transform(self) : (is_callable(fx) && is_callable(fy) ? new Point(fx(self.x), fy(self.y)) : self);
     }
 };
-Point.isFinite = function( p ) {
-    return is_finite(p.x) && is_finite(p.y);
+Point.isFinite = function( pt ) {
+    return is_finite(pt.x) && is_finite(pt.y);
 };
 
 function Matrix( v )
@@ -614,16 +626,19 @@ Matrix[PROTO] = {
     }
 };
 
-function Renderer( container, opts ) { }
+function Renderer( container, opts )
+{
+    // abstract
+}
 Renderer[PROTO] = {
     constructor: Renderer
     ,container: null
-    ,drawLayer: null
-    ,hitDict: null
-    ,nextColor: null
-    ,handler: null
-    ,hitTarget: null
     ,opts: null
+    ,drawLayer: null
+    ,nextColor: null
+    ,hitDict: null
+    ,hitTarget: null
+    ,handler: null
     ,dispose: function( ) {
         var self = this;
         if ( self.container && self.drawLayer )
@@ -637,12 +652,12 @@ Renderer[PROTO] = {
             self.container.removeChild(self.drawLayer);
         }
         self.container = null;
+        self.opts = null;
         self.drawLayer = null;
         self.nextColor = null;
         self.hitDict = null;
         self.hitTarget = null;
         self.handler = null;
-        self.opts = null;
         return self;
     }
     ,defaultOpts: function( ) {
@@ -670,6 +685,24 @@ Renderer[PROTO] = {
                     style: 'solid'
                 },
                 fill: 'none'
+            },
+            label: {
+                text: {
+                    size: 12,
+                    color: '#000000'
+                },
+                border: {
+                    size: 1,
+                    color: '#000000',
+                    style: 'solid'
+                },
+                fill: 'none',
+                padding: {
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    left: 0
+                }
             }
         };
     }
@@ -704,14 +737,9 @@ Renderer.handler = function( evt ) {
             is_callable(obj.extra.listener[type]) )
         {
             coords = {
-                x: pos.left,
-                y: self.height()-pos.top,
-                left: pos.left,
-                top: pos.top,
-                clientX: pos.clientX,
-                clientY: pos.clientY,
-                pageX: pos.pageX,
-                pageY: pos.pageY
+                localX: pos.left, localY: pos.top,
+                clientX: pos.clientX, clientY: pos.clientY,
+                pageX: pos.pageX, pageY: pos.pageY
             };
             obj.extra.listener[type](type, obj, coords, evt);
         }
@@ -753,7 +781,7 @@ Renderer.handler = function( evt ) {
         }
     }
 
-    if ( 'touchmove' === evt.type || 'mousemove' === evt.type )
+    if ( 'touchmove' === evt.type || 'mousemove' === evt.type || 'click' === evt.type )
     {
         pos = getMousePos(self.drawLayer, evt);
         obj = self.objAt(evt, pos);
@@ -764,31 +792,29 @@ Renderer.handler = function( evt ) {
             {
                 if ( self.hitTarget.obj !== obj )
                 {
-                    callListener('leave', self.hitTarget.obj, pos, evt);
+                    callListener('leave', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
                     self.hitTarget = null;
                 }
-                else
+                else if ( 'click' !== evt.type )
                 {
-                    callListener('move', self.hitTarget.obj, pos, evt);
+                    callListener('move', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
                 }
             }
             if ( !self.hitTarget )
             {
                 self.hitTarget = {obj:obj, pos:pos};
-                callListener('enter', self.hitTarget.obj, pos, evt);
+                callListener('enter', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
+            }
+            if ( 'click' === evt.type )
+            {
+                callListener('click', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
             }
         }
         else if ( self.hitTarget )
         {
-            callListener('leave', self.hitTarget.obj, pos, evt);
+            callListener('leave', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
             self.hitTarget = null;
         }
-    }
-    else if ( 'click' === evt.type )
-    {
-        pos = getMousePos(self.drawLayer, evt);
-        obj = self.objAt(evt, pos);
-        callListener('click', obj, pos, evt);
     }
 };
 Renderer.Html = function HtmlRenderer( container, opts ) {
@@ -862,9 +888,9 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         point.style.borderRadius = '50%';
         point.style.backgroundColor = pointColor;
         point.style.left = String(p.x)+'px';
-        point.style.bottom = String(p.y)+'px';
-        point.style.transformOrigin = 'left bottom';
-        point.style.transform = 'translate(-50%,50%)';
+        point.style.top = String(p.y)+'px';
+        point.style.transformOrigin = 'left top';
+        point.style.transform = 'translate(-50%,-50%)';
         point.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
         self.hitDict[point.hitId] = {type:'point', pos:p, extra:extra||null};
         self.drawLayer.appendChild(point);
@@ -894,9 +920,9 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         //line.style.borderColor = 'transparent transparent '+lineColor+' transparent';
         line.style.borderBottom = String(lineSize)+'px '+lineStyle+' '+lineColor;
         line.style.left = String(p1.x)+'px';
-        line.style.bottom = String(p1.y)+'px';
-        line.style.transformOrigin = 'left bottom';
-        line.style.transform = 'rotate('+String(stdMath.atan2(-dy, dx))+'rad)';
+        line.style.top = String(p1.y)+'px';
+        line.style.transformOrigin = 'left top';
+        line.style.transform = 'rotate('+String(stdMath.atan2(dy, dx))+'rad)';
         if ( hitId )
         {
             line.hitId = hitId;
@@ -929,7 +955,7 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         rect.style.height = String(side.y)+'px';
         rect.style.border = 0 < lineSize ? String(lineSize)+'px '+lineStyle+' '+lineColor : 'none';
         rect.style.left = String(center.x-side.x/2)+'px';
-        rect.style.top = String(self.height()-center.y-side.y/2)+'px';
+        rect.style.top = String(center.y-side.y/2)+'px';
         rect.style.transformOrigin = 'center center';
         rect.style.transform = 'rotate('+String((rotation||0)*stdMath.PI/180)+'rad)';
         rect.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -958,7 +984,7 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         ellipse.style.border = 0 < lineSize ? String(lineSize)+'px '+lineStyle+' '+lineColor : 'none';
         ellipse.style.borderRadius = '50%';
         ellipse.style.left = String(center.x-radius.x)+'px';
-        ellipse.style.top = String(self.height()-center.y-radius.y)+'px';
+        ellipse.style.top = String(center.y-radius.y)+'px';
         ellipse.style.transformOrigin = 'center center';
         ellipse.style.transform = 'rotate('+String((rotation||0)*stdMath.PI/180)+'rad)';
         ellipse.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -970,12 +996,13 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
                     largeArcFlag, sweepFlag, end,
                     lineSize, lineColor, lineStyle, extra
     ) {
-        var self = this, hitId, h = self.height(), i, n, params, samples, mat, a0, a1, acw;
-        params = svgArc2canvasArc({x:start.x,y:h-start.y}, radius, xAxisRotation||0, largeArcFlag?1:0, sweepFlag?1:0, {x:end.x,y:h-end.y});
+        var self = this, hitId, i, n, params, samples, mat, a0, a1, acw,
+            h = self.height();
+        params = svgArc2canvasArc(start, radius, xAxisRotation||0, largeArcFlag?1:0, sweepFlag?1:0, end);
         //params = [centpX, centpY, xAxisRotation, sx, sy, rad, ang1, angd, sweepFlag];
         a0 = params[6]; a1 = params[6]+params[7]; acw = 1-params[8];
-        mat = Matrix().translate(params[0], h-params[1]).mul(Matrix().rotate(-params[2]).mul(Matrix().scale(params[3], (acw?1:-1)*params[4])));
-        samples = subdividePath(arc({x:0,y:0}, {x:params[5],y:params[5]}), acw ? -a1+stdMath.PI : a0, acw ? -a0+stdMath.PI : a1, 0.1, 20).map(function(p){return mat.transform(p);});
+        mat = Matrix().scale(params[3], (acw?1:-1)*params[4]).rotate(-params[2]).translate(params[0], h-params[1]);
+        samples = subdividePath(arc({x:0,y:0}, {x:params[5],y:params[5]}), acw ? -a0 : a0, acw ? -a1 : a1, 0.1, 20).map(function(pt){pt = mat.transform(pt); pt.y = h-pt.y; return pt;});
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
@@ -989,11 +1016,11 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawBezier: function( points, lineSize, lineColor, lineStyle, extra ) {
-        var self = this, hitId, i, n,
+        var self = this, hitId, i, n, mat, h = self.height(),
             samples = subdividePath({
-                x: bezier(points.map(function(p){return p.x;})),
-                y: bezier(points.map(function(p){return p.y;}))
-            }, 0, 1, 0.5, 20);
+                x: bezier(points.map(X)),
+                y: bezier(points.map(Y).map(YH(h)))
+            }, 0, 1, 0.5, 20).map(YH(h));
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
@@ -1005,51 +1032,39 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
             self.drawLine(samples[i], samples[i+1], lineSize, lineColor, lineStyle, null, hitId);
         return self;
     }
-    ,fitText: function( txt, text, x, y, maxWidth, lineHeight ) {
-        var self = this, words = text.split(/\s+/), line = [],
-            n, l, testLine, testWidth,
-            metricTxt = document.createElement('span');
+    ,fitText: function( text, metricObj, maxWidth, lineHeight ) {
+        var self = this, words = text.split(SPC),
+            line = [], lines = [], w = 0,
+            n, l, testLine, testWidth;
 
-        function appendLine( line )
-        {
-            var tspan = document.createElement('span');
-            tspan.style.position = 'relative';
-            tspan.style.display = 'block';
-            tspan.style.padding = '0px';
-            tspan.style.margin = '0px';
-            tspan.textContent = line.join(' ');
-            txt.appendChild(tspan);
-        }
-        metricTxt.style.display = 'inline-block';
-        metricTxt.style.fontSize = txt.style.fontSize;
-        metricTxt.style.fontFamily = txt.style.fontFamily;
-        metricTxt.style.padding = '0px';
-        metricTxt.style.visibility = 'hidden';
-        self.drawLayer.appendChild(metricTxt);
+        metricObj.style.visibility = 'hidden';
+        self.drawLayer.appendChild(metricObj);
         for(n=0,l=words.length; n<l; n++)
         {
             testLine = line.concat(words[n]);
-            metricTxt.textContent = testLine.join(' ');
-            testWidth = metricTxt.clientWidth;
-            if ( testWidth > maxWidth && n > 0 )
+            metricObj.textContent = testLine.join(' ');
+            testWidth = metricObj.clientWidth;
+            if ( (testWidth > maxWidth) && (0 < line.length) )
             {
-                appendLine(line);
+                lines.push(line.join(' '));
                 line = [words[n]];
-                y += lineHeight;
             }
             else
             {
                 line = testLine;
+                w = stdMath.max(w, testWidth);
             }
         }
-        if ( line.length ) appendLine(line);
-        self.drawLayer.removeChild(metricTxt);
-        return self;
+        if ( line.length )
+        {
+            lines.push(line.join(' '));
+            w = stdMath.max(w, testWidth);
+        }
+        self.drawLayer.removeChild(metricObj);
+        return {lines:lines, width:w, height:(lines.length-1)*lineHeight};
     }
-    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
-        var self = this, text = document.createElement('div');
-        textSize = null != textSize ? textSize : self.opts.text.size;
-        textColor = String(textColor || self.opts.text.color).toLowerCase();
+    ,createText: function( str, textSize, textColor, maxWidth, lineHeight ) {
+        var self = this, text = document.createElement('div'), metric, fitted;
         text.className = '--plot-text';
         text.style.position = 'absolute';
         text.style.display = 'inline-block';
@@ -1063,18 +1078,70 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         text.style.fontSize = String(textSize)+'px';
         text.style.fontFamily = 'sans-serif';
         text.style.textAlign = 'left';
-        text.style.left = String(p.x)+'px';
-        text.style.top = String(self.height()-p.y-textSize)+'px';
-        if ( maxWidth )
-        {
-            text.style.lineHeight = String(1.2*textSize)+'px';
-            self.fitText(text, String(str), p.x, p.y, maxWidth, 1.2*textSize);
-        }
-        else
-        {
-            text.textContent = String(str);
-        }
-        self.drawLayer.appendChild(text);
+        text.style.lineHeight = String(lineHeight)+'px';
+        metric = document.createElement('span');
+        metric.style.display = 'inline-block';
+        metric.style.fontSize = String(textSize)+'px';
+        metric.style.fontFamily = 'sans-serif';
+        metric.style.padding = '0px';
+        metric.style.margin = '0px';
+        metric.style.border = 'none';
+        fitted = self.fitText(str, metric, null==maxWidth ? Infinity : maxWidth, lineHeight);
+        fitted.el = text;
+        return fitted;
+    }
+    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
+        var self = this, text, lineHeight;
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
+        lineHeight = 1.2*textSize;
+        text = self.createText(String(str), textSize, textColor, maxWidth, lineHeight);
+        text.el.style.left = String(p.x)+'px';
+        text.el.style.top = String(p.y-textSize)+'px';
+        text.lines.forEach(function(line){
+            var tspan = document.createElement('span');
+            tspan.style.position = 'relative';
+            tspan.style.display = 'block';
+            tspan.style.padding = '0px';
+            tspan.style.margin = '0px';
+            tspan.style.border = 'none';
+            tspan.textContent = line;
+            text.el.appendChild(tspan);
+        });
+        self.drawLayer.appendChild(text.el);
+        return self;
+    }
+    ,drawLabel: function( pos, size, txt, opts ) {
+        var self = this, maxWidth, lineHeight, x, y, w, h, text;
+        opts = extend(true, clone(self.opts), opts||{});
+        maxWidth = 'auto'===size.x ? Infinity : (size.x-opts.label.padding.left-opts.label.padding.right);
+        lineHeight = 1.2*opts.label.text.size;
+        text = self.createText(String(txt), opts.label.text.size, opts.label.text.color, maxWidth, lineHeight);
+        w = 'auto'===size.x ? (text.width+opts.label.padding.left+opts.label.padding.right) : size.x;
+        h = 'auto'===size.y ? (text.height+opts.label.padding.top+opts.label.padding.bottom) : size.y;
+        x = pos.x; y = pos.y;
+        if ( 'left' === x ) x = 0;
+        else if ( 'right' === x ) x = self.width()-w;
+        else if ( 'center' === x ) x = (self.width()-w)/2;
+        if ( 'top' === y ) y = 0;
+        else if ( 'bottom' === y ) y = self.height()-h;
+        else if ( 'center' === y ) y = (self.height()-h)/2;
+        self.drawRect({x:x+w/2,y:y+h/2}, {x:w,y:h}, 0, opts.label.border.size, opts.label.border.color, opts.label.border.style, opts.label.fill);
+        x += opts.label.padding.left;
+        y += opts.label.padding.top;
+        text.el.style.left = String(x)+'px';
+        text.el.style.top = String(y-opts.label.text.size)+'px';
+        text.lines.forEach(function(line){
+            var tspan = document.createElement('span');
+            tspan.style.position = 'relative';
+            tspan.style.display = 'block';
+            tspan.style.padding = '0px';
+            tspan.style.margin = '0px';
+            tspan.style.border = 'none';
+            tspan.textContent = line;
+            text.el.appendChild(tspan);
+        });
+        self.drawLayer.appendChild(text.el);
         return self;
     }
 });
@@ -1184,7 +1251,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         ctx.resetTransform();
         ctx.fillStyle = pointColor;
         ctx.beginPath();
-        ctx.arc(p.x, self.height()-p.y, pointSize, 0, 2*stdMath.PI);
+        ctx.arc(p.x, p.y, pointSize, 0, 2*stdMath.PI);
         ctx.closePath();
         ctx.fill();
 
@@ -1194,13 +1261,13 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         ctx.resetTransform();
         ctx.fillStyle = c;
         ctx.beginPath();
-        ctx.arc(p.x, self.height()-p.y, pointSize, 0, 2*stdMath.PI);
+        ctx.arc(p.x, p.y, pointSize, 0, 2*stdMath.PI);
         ctx.closePath();
         ctx.fill();
         return self;
     }
     ,drawLine: function( p1, p2, lineSize, lineColor, lineStyle, extra ) {
-        var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
+        var self = this, c, ctx = self.drawLayer.getContext('2d');
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
@@ -1216,8 +1283,8 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
             ctx.setLineDash([]); // solid
         ctx.lineWidth = lineSize;
         ctx.strokeStyle = lineColor;
-        ctx.moveTo(p1.x, h-p1.y);
-        ctx.lineTo(p2.x, h-p2.y);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
         ctx.closePath();
 
@@ -1228,14 +1295,14 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         ctx.beginPath();
         ctx.lineWidth = lineSize;
         ctx.strokeStyle = c;
-        ctx.moveTo(p1.x, h-p1.y);
-        ctx.lineTo(p2.x, h-p2.y);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
         ctx.closePath();
         return self;
     }
     ,drawRect: function( center, side, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
-        var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
+        var self = this, c, ctx = self.drawLayer.getContext('2d');
         lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
@@ -1243,7 +1310,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
             lineStyle = 'solid';
         fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ctx.resetTransform();
-        ctx.translate(center.x, h-center.y);
+        ctx.translate(center.x, center.y);
         ctx.rotate((rotation||0)*stdMath.PI/180);
         ctx.beginPath();
         if ( 0 < lineSize )
@@ -1274,7 +1341,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         self.hitDict[c] = {type:'rect', center:center, side:side, rotation:rotation, extra:extra||null};
         ctx = self.hitCanvas.getContext("2d");
         ctx.resetTransform();
-        ctx.translate(center.x, h-center.y);
+        ctx.translate(center.x, center.y);
         ctx.rotate((rotation||0)*stdMath.PI/180);
         ctx.beginPath();
         if ( 0 < lineSize )
@@ -1294,7 +1361,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawEllipse: function( center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
-        var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
+        var self = this, c, ctx = self.drawLayer.getContext('2d');
         lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
@@ -1314,7 +1381,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
             ctx.lineWidth = lineSize;
             ctx.strokeStyle = lineColor;
         }
-        ctx.ellipse(center.x, h-center.y, radius.x, radius.y, (rotation||0)*stdMath.PI/180, 0, 2*stdMath.PI, 0);
+        ctx.ellipse(center.x, center.y, radius.x, radius.y, (rotation||0)*stdMath.PI/180, 0, 2*stdMath.PI, 0);
         if ( fill && 'none' !== fill )
         {
             ctx.fillStyle = fill;
@@ -1335,7 +1402,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
             ctx.lineWidth = lineSize;
             ctx.strokeStyle = c;
         }
-        ctx.ellipse(center.x, h-center.y, radius.x, radius.y, (rotation||0)*stdMath.PI/180, 0, 2*stdMath.PI, 0);
+        ctx.ellipse(center.x, center.y, radius.x, radius.y, (rotation||0)*stdMath.PI/180, 0, 2*stdMath.PI, 0);
         ctx.fillStyle = c;
         ctx.fill()
         if ( 0 < lineSize )
@@ -1348,11 +1415,11 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
                     largeArcFlag, sweepFlag, end,
                     lineSize, lineColor, lineStyle, extra
     ) {
-        var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d'), params;
+        var self = this, c, ctx = self.drawLayer.getContext('2d'), params;
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
-        params = svgArc2canvasArc({x:start.x,y:h-start.y}, radius, xAxisRotation||0, largeArcFlag?1:0, sweepFlag?1:0, {x:end.x,y:h-end.y});
+        params = svgArc2canvasArc(start, radius, xAxisRotation||0, largeArcFlag?1:0, sweepFlag?1:0, end);
         //params = [centpX, centpY, xAxisRotation, sx, sy, rad, ang1, angd, sweepFlag];
         ctx.resetTransform();
         ctx.beginPath();
@@ -1393,7 +1460,7 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawBezier: function( points, lineSize, lineColor, lineStyle, extra ) {
-        var self = this, c, h = self.height(), ctx = self.drawLayer.getContext('2d');
+        var self = this, c, ctx = self.drawLayer.getContext('2d');
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
@@ -1409,8 +1476,8 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
             ctx.setLineDash([]); // solid
         ctx.lineWidth = lineSize;
         ctx.strokeStyle = lineColor;
-        ctx.moveTo(points[0].x, h-points[0].y);
-        ctx.bezierCurveTo(points[1].x, h-points[1].y, points[2].x, h-points[2].y, points[3].x, h-points[3].y);
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.bezierCurveTo(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y);
         ctx.stroke();
         ctx.closePath();
 
@@ -1421,47 +1488,85 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         ctx.beginPath();
         ctx.lineWidth = lineSize;
         ctx.strokeStyle = c;
-        ctx.moveTo(points[0].x, h-points[0].y);
-        ctx.bezierCurveTo(points[1].x, h-points[1].y, points[2].x, h-points[2].y, points[3].x, h-points[3].y);
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.bezierCurveTo(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y);
         ctx.stroke();
         ctx.closePath();
         return self;
     }
-    ,fitText: function( ctx, text, x, y, maxWidth, lineHeight ) {
-        var self = this, words = text.split(/\s+/), line = [],
+    ,fitText: function( text, metricCtx, maxWidth, lineHeight ) {
+        var self = this, words = text.split(SPC),
+            line = [], lines = [], w = 0,
             n, l, testLine, metrics, testWidth;
 
         for(n=0,l=words.length; n<l; n++)
         {
             testLine = line.concat(words[n]);
-            metrics = ctx.measureText(testLine.join(' '));
+            metrics = metricCtx.measureText(testLine.join(' '));
             testWidth = metrics.width;
-            if ( testWidth > maxWidth && n > 0 )
+            if ( (testWidth > maxWidth) && (0 < line.length) )
             {
-                ctx.fillText(line.join(' '), x, y);
+                lines.push(line.join(' '));
                 line = [words[n]];
-                y += lineHeight;
             }
             else
             {
                 line = testLine;
+                w = stdMath.max(w, testWidth);
             }
         }
         if ( line.length )
-            ctx.fillText(line.join(' '), x, y);
-        return self;
+        {
+            lines.push(line.join(' '));
+            w = stdMath.max(w, testWidth);
+        }
+        return {lines:lines, width:w, height:(lines.length-1)*lineHeight};
     }
-    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
-        var self = this, h = self.height(), ctx = self.drawLayer.getContext('2d');
-        textSize = null != textSize ? textSize : self.opts.text.size;
-        textColor = String(textColor || self.opts.text.color).toLowerCase();
+    ,createText: function( str, textSize, textColor, maxWidth, lineHeight ) {
+        var self = this, ctx = self.drawLayer.getContext('2d'), fitted;
         ctx.resetTransform();
         ctx.font = String(textSize)+'px sans-serif';
         ctx.fillStyle = textColor;
-        if ( maxWidth )
-            self.fitText(ctx, String(str), p.x, h-p.y, maxWidth, 1.2*textSize);
-        else
-            ctx.fillText(String(str), p.x, h-p.y);
+        fitted = self.fitText(str, ctx, null==maxWidth ? Infinity : maxWidth, lineHeight);
+        fitted.el = ctx;
+        return fitted;
+    }
+    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
+        var self = this, text, lineHeight, dy = 0;
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
+        lineHeight = 1.2*textSize;
+        text = self.createText(String(str), textSize, textColor, maxWidth, lineHeight);
+        text.lines.forEach(function(line){
+            text.el.fillText(line, p.x, p.y+dy);
+            dy += lineHeight;
+        });
+        return self;
+    }
+    ,drawLabel: function( pos, size, txt, opts ) {
+        var self = this, maxWidth, lineHeight, x, y, dy = 0, w, h, text;
+        opts = extend(true, clone(self.opts), opts||{});
+        maxWidth = 'auto'===size.x ? Infinity : (size.x-opts.label.padding.left-opts.label.padding.right);
+        lineHeight = 1.2*opts.label.text.size;
+        text = self.createText(String(txt), opts.label.text.size, opts.label.text.color, maxWidth, lineHeight);
+        text.el.save();
+        w = 'auto'===size.x ? (text.width+opts.label.padding.left+opts.label.padding.right) : size.x;
+        h = 'auto'===size.y ? (text.height+opts.label.padding.top+opts.label.padding.bottom) : size.y;
+        x = pos.x; y = pos.y;
+        if ( 'left' === x ) x = 0;
+        else if ( 'right' === x ) x = self.width()-w;
+        else if ( 'center' === x ) x = (self.width()-w)/2;
+        if ( 'top' === y ) y = 0;
+        else if ( 'bottom' === y ) y = self.height()-h;
+        else if ( 'center' === y ) y = (self.height()-h)/2;
+        self.drawRect({x:x+w/2,y:y+h/2}, {x:w,y:h}, 0, opts.label.border.size, opts.label.border.color, opts.label.border.style, opts.label.fill);
+        x += opts.label.padding.left;
+        y += opts.label.padding.top;
+        text.el.restore();
+        text.lines.forEach(function(line){
+            text.el.fillText(line, x, y+dy);
+            dy += lineHeight;
+        });
         return self;
     }
 });
@@ -1531,12 +1636,12 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawPoint: function( p, pointSize, pointColor, extra ) {
-        var self = this, h = self.height(), point = document.createElementNS(self.NS,'circle');
+        var self = this, point = document.createElementNS(self.NS,'circle');
         pointSize = null!=pointSize ? pointSize : self.opts.point.size;
         pointColor = String(pointColor || self.opts.point.color).toLowerCase();
         point.setAttribute('class', '--plot-point');
         point.setAttribute('cx', String(p.x));
-        point.setAttribute('cy', String(h-p.y));
+        point.setAttribute('cy', String(p.y));
         point.setAttribute('r', String(pointSize));
         point.setAttribute('stroke-width', '1px');
         point.setAttribute('stroke', pointColor);
@@ -1547,7 +1652,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawLine: function( p1, p2, lineSize, lineColor, lineStyle, extra ) {
-        var self = this, h = self.height(), line = document.createElementNS(self.NS,'line');
+        var self = this, line = document.createElementNS(self.NS,'line');
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
@@ -1555,9 +1660,9 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
             lineStyle = 'solid';
         line.setAttribute('class', '--plot-line');
         line.setAttribute('x1', String(p1.x));
-        line.setAttribute('y1', String(h-p1.y));
+        line.setAttribute('y1', String(p1.y));
         line.setAttribute('x2', String(p2.x));
-        line.setAttribute('y2', String(h-p2.y));
+        line.setAttribute('y2', String(p2.y));
         line.setAttribute('stroke-width', String(lineSize)+'px');
         line.setAttribute('stroke', lineColor);
         if ( 'dashed' === lineStyle )
@@ -1570,7 +1675,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawRect: function( center, side, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
-        var self = this, h = self.height(), rect = document.createElementNS(self.NS, 'rect');
+        var self = this, rect = document.createElementNS(self.NS, 'rect');
         lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
@@ -1579,10 +1684,10 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         rect.setAttribute('class', '--plot-rectangle');
         rect.setAttribute('x', String(center.x-side.x/2));
-        rect.setAttribute('y', String(h-center.y-side.y/2));
+        rect.setAttribute('y', String(center.y-side.y/2));
         rect.setAttribute('width', String(side.x));
         rect.setAttribute('height', String(side.y));
-        rect.setAttribute('transform', 'rotate('+String(rotation||0)+' '+String(center.x)+' '+String(h-center.y)+')');
+        rect.setAttribute('transform', 'rotate('+String(rotation||0)+' '+String(center.x)+' '+String(center.y)+')');
         if ( 0 < lineSize )
         {
             rect.setAttribute('stroke-width', String(lineSize)+'px');
@@ -1599,7 +1704,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawEllipse: function( center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra ) {
-        var self = this, h = self.height(), ellipse = document.createElementNS(self.NS, 'ellipse');
+        var self = this, ellipse = document.createElementNS(self.NS, 'ellipse');
         lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
@@ -1608,10 +1713,10 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
         ellipse.setAttribute('class', '--plot-ellipse');
         ellipse.setAttribute('cx', String(center.x));
-        ellipse.setAttribute('cy', String(h-center.y));
+        ellipse.setAttribute('cy', String(center.y));
         ellipse.setAttribute('rx', String(radius.x));
         ellipse.setAttribute('ry', String(radius.y));
-        ellipse.setAttribute('transform', 'rotate('+String(rotation||0)+' '+String(center.x)+' '+String(h-center.y)+')');
+        ellipse.setAttribute('transform', 'rotate('+String(rotation||0)+' '+String(center.x)+' '+String(center.y)+')');
         if ( 0 < lineSize )
         {
             ellipse.setAttribute('stroke-width', String(lineSize)+'px');
@@ -1631,14 +1736,14 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
                     largeArcFlag, sweepFlag, end,
                     lineSize, lineColor, lineStyle, extra
     ) {
-        var self = this, h = self.height(), path = document.createElementNS(self.NS,'path');
+        var self = this, path = document.createElementNS(self.NS,'path');
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-arc');
-        path.setAttribute('d', 'M '+String(start.x)+' '+String(h-start.y)+' A '+String(radius.x)+' '+String(radius.y)+' '+String(xAxisRotation||0)+' '+String(largeArcFlag?1:0)+' '+String(sweepFlag?1:0)+' '+String(end.x)+' '+String(h-end.y));
+        path.setAttribute('d', 'M '+String(start.x)+' '+String(start.y)+' A '+String(radius.x)+' '+String(radius.y)+' '+String(xAxisRotation||0)+' '+String(largeArcFlag?1:0)+' '+String(sweepFlag?1:0)+' '+String(end.x)+' '+String(end.y));
         path.setAttribute('stroke-width', String(lineSize)+'px');
         path.setAttribute('stroke', lineColor);
         path.setAttribute('fill', 'none');
@@ -1653,14 +1758,14 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         return self;
     }
     ,drawBezier: function( points, lineSize, lineColor, lineStyle, extra ) {
-        var self = this, h = self.height(), path = document.createElementNS(self.NS,'path');
+        var self = this, path = document.createElementNS(self.NS,'path');
         lineSize = null!=lineSize ? lineSize : self.opts.line.size;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-bezier');
-        path.setAttribute('d', 'M '+String(points[0].x)+','+String(h-points[0].y)+' C '+String(points[1].x)+','+String(h-points[1].y)+' '+String(points[2].x)+','+String(h-points[2].y)+' '+String(points[3].x)+','+String(h-points[3].y));
+        path.setAttribute('d', 'M '+String(points[0].x)+','+String(points[0].y)+' C '+String(points[1].x)+','+String(points[1].y)+' '+String(points[2].x)+','+String(points[2].y)+' '+String(points[3].x)+','+String(points[3].y));
         path.setAttribute('stroke-width', String(lineSize)+'px');
         path.setAttribute('stroke', lineColor);
         if ( 'dashed' === lineStyle )
@@ -1672,59 +1777,96 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         self.drawLayer.appendChild(path);
         return self;
     }
-    ,fitText: function( txt, text, x, y, maxWidth, lineHeight ) {
-        var self = this, words = text.split(/\s+/), line = [],
-            n, l, testLine, metrics, testWidth, dy = 0,
-            metricTxt = txt.cloneNode(false);
+    ,fitText: function( text, metricObj, maxWidth, lineHeight ) {
+        var self = this, words = text.split(SPC),
+            line = [], lines = [], w = 0,
+            n, l, testLine, metrics, testWidth;
 
-        function appendLine( line )
-        {
-            var tspan = document.createElementNS(self.NS, 'tspan');
-            tspan.setAttribute('x', x);
-            tspan.setAttribute('dy', dy);
-            tspan.textContent = line.join(' ');
-            txt.appendChild(tspan);
-            if ( 0 === dy ) dy = lineHeight;
-        }
-        metricTxt.style.visibility = 'hidden';
-        self.drawLayer.appendChild(metricTxt);
+        metricObj.style.visibility = 'hidden';
+        self.drawLayer.appendChild(metricObj);
         for(n=0,l=words.length; n<l; n++)
         {
             testLine = line.concat(words[n]);
-            metricTxt.textContent = testLine.join(' ');
-            metrics = metricTxt.getBBox();
+            metricObj.textContent = testLine.join(' ');
+            metrics = metricObj.getBBox();
             testWidth = stdMath.round(metrics.width);
-            if ( testWidth > maxWidth && n > 0 )
+            if ( (testWidth > maxWidth) && (0 < line.length) )
             {
-                appendLine(line);
+                lines.push(line.join(' '));
                 line = [words[n]];
-                y += lineHeight;
             }
             else
             {
                 line = testLine;
+                w = stdMath.max(w, testWidth);
             }
         }
-        if ( line.length ) appendLine(line);
-        self.drawLayer.removeChild(metricTxt);
-        return self;
+        if ( line.length )
+        {
+            lines.push(line.join(' '));
+            w = stdMath.max(w, testWidth);
+        }
+        self.drawLayer.removeChild(metricObj);
+        return {lines:lines, width:w, height:(lines.length-1)*lineHeight};
     }
-    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
-        var self = this, text, h = self.height();
-        textSize = null != textSize ? textSize : self.opts.text.size;
-        textColor = String(textColor || self.opts.text.color).toLowerCase();
-        text = document.createElementNS(self.NS, 'text');
+    ,createText: function( str, textSize, textColor, maxWidth, lineHeight ) {
+        var self = this, text = document.createElementNS(self.NS, 'text'), fitted;
         text.setAttribute('class', '--plot-text');
-        text.setAttribute('x', p.x);
-        text.setAttribute('y', h-p.y);
         text.setAttribute('fill', textColor);
         text.style.fontSize = String(textSize)+'px';
         text.style.fontFamily = 'sans-serif';
-        if ( maxWidth )
-            self.fitText(text, String(str), p.x, h-p.y, maxWidth, 1.2*textSize);
-        else
-            text.textContent = String(str);
-        self.drawLayer.appendChild(text);
+        fitted = self.fitText(str, text.cloneNode(false), null==maxWidth ? Infinity : maxWidth, lineHeight);
+        fitted.el = text;
+        return fitted;
+    }
+    ,drawText: function( p, str, textSize, textColor, maxWidth ) {
+        var self = this, text, lineHeight, dy = 0;
+        textSize = null != textSize ? textSize : self.opts.text.size;
+        textColor = String(textColor || self.opts.text.color).toLowerCase();
+        lineHeight = 1.2*textSize;
+        text = self.createText(String(str), textSize, textColor, maxWidth, lineHeight);
+        text.el.setAttribute('x', p.x);
+        text.el.setAttribute('y', p.y);
+        text.lines.forEach(function(line){
+            var tspan = document.createElementNS(self.NS, 'tspan');
+            tspan.setAttribute('x', p.x);
+            tspan.setAttribute('dy', dy);
+            tspan.textContent = line;
+            text.el.appendChild(tspan);
+            if ( 0 === dy ) dy = lineHeight;
+        });
+        self.drawLayer.appendChild(text.el);
+        return self;
+    }
+    ,drawLabel: function( pos, size, txt, opts ) {
+        var self = this, maxWidth, lineHeight, x, y, dy = 0, w, h, text;
+        opts = extend(true, clone(self.opts), opts||{});
+        maxWidth = 'auto'===size.x ? Infinity : (size.x-opts.label.padding.left-opts.label.padding.right);
+        lineHeight = 1.2*opts.label.text.size;
+        text = self.createText(String(txt), opts.label.text.size, opts.label.text.color, maxWidth, lineHeight);
+        w = 'auto'===size.x ? (text.width+opts.label.padding.left+opts.label.padding.right) : size.x;
+        h = 'auto'===size.y ? (text.height+opts.label.padding.top+opts.label.padding.bottom) : size.y;
+        x = pos.x; y = pos.y;
+        if ( 'left' === x ) x = 0;
+        else if ( 'right' === x ) x = self.width()-w;
+        else if ( 'center' === x ) x = (self.width()-w)/2;
+        if ( 'top' === y ) y = 0;
+        else if ( 'bottom' === y ) y = self.height()-h;
+        else if ( 'center' === y ) y = (self.height()-h)/2;
+        self.drawRect({x:x+w/2,y:y+h/2}, {x:w,y:h}, 0, opts.label.border.size, opts.label.border.color, opts.label.border.style, opts.label.fill);
+        x += opts.label.padding.left;
+        y += opts.label.padding.top;
+        text.el.setAttribute('x', x);
+        text.el.setAttribute('y', y);
+        text.lines.forEach(function(line){
+            var tspan = document.createElementNS(self.NS, 'tspan');
+            tspan.setAttribute('x', x);
+            tspan.setAttribute('dy', dy);
+            tspan.textContent = line;
+            text.el.appendChild(tspan);
+            if ( 0 === dy ) dy = lineHeight;
+        });
+        self.drawLayer.appendChild(text.el);
         return self;
     }
 });
@@ -1793,6 +1935,24 @@ Plot[PROTO] = {
                     style: 'solid'
                 },
                 fill: 'none'
+            },
+            label: {
+                text: {
+                    size: 14,
+                    color: '#000000'
+                },
+                border: {
+                    size: 1,
+                    color: '#000000',
+                    style: 'solid'
+                },
+                fill: 'none',
+                padding: {
+                    top: 20,
+                    right: 20,
+                    bottom: 20,
+                    left: 20
+                }
             },
 
             colors: null,
@@ -2056,17 +2216,9 @@ Plot[PROTO] = {
     }
 
     ,label: function( pos, size, text, opts ) {
-        var self = this, i, n;
-        opts = extend(true, clone(self.opts), opts||{});
+        var self = this;
         self.renderer.init(); // lazy init
-        if ( 'left'===pos.x ) pos.x = 0;
-        else if ( 'right'===pos.x ) pos.x = self.renderer.width()-size.x;
-        else if ( 'center'===pos.x ) pos.x = (self.renderer.width()-size.x)/2;
-        if ( 'bottom'===pos.y ) pos.y = size.y;
-        else if ( 'top'===pos.y ) pos.y = self.renderer.height();
-        else if ( 'center'===pos.y ) pos.y = (self.renderer.height()+size.y)/2;
-        self.renderer.drawRect({x:pos.x+size.x/2, y:pos.y-size.y/2}, size, 0, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
-        self.renderer.drawText({x:pos.x+opts.padding.left, y:pos.y-opts.padding.top}, text, opts.text.size, opts.text.color, size.x-opts.padding.right-opts.padding.left);
+        self.renderer.drawLabel(pos, size, text, extend(true, clone(self.opts), opts||{}));
         return self;
     }
 
@@ -2098,7 +2250,7 @@ Plot[PROTO] = {
         w = (boundingBox.max.x-boundingBox.min.x)+EPS;
         h = (boundingBox.max.y-boundingBox.min.y)+EPS;
         s = stdMath.min((vw-padl-padr)/w, (vh-padt-padb)/h);
-        vm = new Matrix().translate(-boundingBox.min.x, -boundingBox.min.y).scale(s).translate(padl+((vw-padl-padr)-s*w)/2, padb+((vh-padt-padb)-s*h)/2);
+        vm = new Matrix().translate(-boundingBox.min.x, -boundingBox.min.y).scale(s).translate(padl+((vw-padl-padr)-s*w)/2, padt+((vh-padt-padb)-s*h)/2);
         o = vm.transform(new Point(0, 0)).apply(stdMath.round);
 
         if ( opts.axes )
@@ -2130,17 +2282,17 @@ Plot[PROTO] = {
                     t0 = t0+i*ts;
                     st0 = scy(t0);
                     st0n = scy(t0n);
-                    while(st0 <= vh-padt || st0n >= padb )
+                    while(st0 <= vh-padb || st0n >= padt )
                     {
-                        if ( padb <= st0 && st0 <= vh-padt )
+                        if ( padt <= st0 && st0 <= vh-padb )
                         {
-                            self.renderer.drawLine({x:padl, y:st0}, {x:vw-padr, y:st0}, opts.axes.y.ticks.size, opts.axes.y.ticks.color, opts.axes.y.ticks.style);
-                            ty.push({y:st0, v:(n+i)*sty});
+                            self.renderer.drawLine({x:padl, y:vh-st0}, {x:vw-padr, y:vh-st0}, opts.axes.y.ticks.size, opts.axes.y.ticks.color, opts.axes.y.ticks.style);
+                            ty.push({y:vh-st0, v:(n+i)*sty});
                         }
-                        if ( padb <= st0n && st0n <= vh-padt )
+                        if ( padt <= st0n && st0n <= vh-padb )
                         {
-                            self.renderer.drawLine({x:padl, y:st0n}, {x:vw-padr, y:st0n}, opts.axes.y.ticks.size, opts.axes.y.ticks.color, opts.axes.y.ticks.style);
-                            tyn.push({y:st0n, v:(n+j)*sty});
+                            self.renderer.drawLine({x:padl, y:vh-st0n}, {x:vw-padr, y:vh-st0n}, opts.axes.y.ticks.size, opts.axes.y.ticks.color, opts.axes.y.ticks.style);
+                            tyn.push({y:vh-st0n, v:(n+j)*sty});
                         }
                         t0 += ts; t0n -= ts; i++; j--;
                         st0 = scy(t0);
@@ -2180,12 +2332,12 @@ Plot[PROTO] = {
                     {
                         if ( padl <= st0 && st0 <= vw-padr )
                         {
-                            self.renderer.drawLine({x:st0, y:padb}, {x:st0, y:vh-padt}, opts.axes.x.ticks.size, opts.axes.x.ticks.color, opts.axes.x.ticks.style);
+                            self.renderer.drawLine({x:st0, y:vh-padb}, {x:st0, y:padt}, opts.axes.x.ticks.size, opts.axes.x.ticks.color, opts.axes.x.ticks.style);
                             tx.push({x:st0, v:(n+i)*stx});
                         }
                         if ( padl <= st0n && st0n <= vh-padr )
                         {
-                            self.renderer.drawLine({x:st0n, y:padb}, {x:st0n, y:vh-padt}, opts.axes.x.ticks.size, opts.axes.x.ticks.color, opts.axes.x.ticks.style);
+                            self.renderer.drawLine({x:st0n, y:vh-padb}, {x:st0n, y:padt}, opts.axes.x.ticks.size, opts.axes.x.ticks.color, opts.axes.x.ticks.style);
                             txn.push({x:st0n, v:(n+j)*stx});
                         }
                         t0 += ts; t0n -= ts; i++; j--;
@@ -2196,43 +2348,48 @@ Plot[PROTO] = {
             }
 
             // draw x-axis
-            if ( opts.axes.x && (o.y >= padb) && (o.y <= vh-padt) )
+            if ( opts.axes.x && (o.y >= padt) && (o.y <= vh-padb) )
             {
-                self.renderer.drawLine({x:padl, y:o.y}, {x:vw-padr, y:o.y}, opts.axes.x.size, opts.axes.x.color, opts.axes.x.style);
+                self.renderer.drawLine({x:padl, y:vh-o.y}, {x:vw-padr, y:vh-o.y}, opts.axes.x.size, opts.axes.x.color, opts.axes.x.style);
             }
 
             // draw y-axis
             if ( opts.axes.y && (o.x >= padl) && (o.x <= vw-padr) )
             {
-                self.renderer.drawLine({x:o.x, y:padb}, {x:o.x, y:vh-padt}, opts.axes.y.size, opts.axes.y.color, opts.axes.y.style);
+                self.renderer.drawLine({x:o.x, y:padt}, {x:o.x, y:vh-padb}, opts.axes.y.size, opts.axes.y.color, opts.axes.y.style);
             }
         }
 
         points = points.map(function(pt){return vm.transform(pt);});
         evtHandler = function( type, obj, coords, evt ) {
-            var t;
+            var tip = self.tooltip, t;
             if ( 'enter' === type )
             {
-                self.tooltip.classList.remove('--plot-hide-tooltip');
-                self.tooltip.classList.add('--plot-show-tooltip');
-                self.tooltip.style.left = String(coords.pageX) + 'px';
-                self.tooltip.style.top = String(coords.pageY) + 'px';
-                t = (coords.x-obj.pos[0].x)/(obj.pos[1].x-obj.pos[0].x);
-                self.tooltip.innerHTML = 'x: '+String(interpolate(obj.extra.p1.x, obj.extra.p2.x, t))+'<br />y: '+String(interpolate(obj.extra.p1.y, obj.extra.p2.y, t));
+                tip.classList.remove('--plot-hide-tooltip');
+                tip.classList.add('--plot-show-tooltip');
             }
             else if ( 'leave' === type )
             {
-                self.tooltip.classList.remove('--plot-show-tooltip');
-                self.tooltip.classList.add('--plot-hide-tooltip');
+                tip.classList.remove('--plot-show-tooltip');
+                tip.classList.add('--plot-hide-tooltip');
+                return;
             }
-            else if ( 'move' === type )
+            t = (coords.localX-obj.pos[0].x)/(obj.pos[1].x-obj.pos[0].x);
+            tip.innerHTML = 'x: '+String(interpolate(obj.extra.p1.x, obj.extra.p2.x, t)) + '<br />y: ' + String(interpolate(obj.extra.p1.y, obj.extra.p2.y, t));
+            tip.style.left = String(coords.pageX) + 'px';
+            tip.style.top = String(coords.pageY) + 'px';
+            /*if ( coords.pageX+tip.clientWidth > document.html.clientWidth )
             {
-                self.tooltip.style.left = String(coords.pageX) + 'px';
-                self.tooltip.style.top = String(coords.pageY) + 'px';
-                t = (coords.x-obj.pos[0].x)/(obj.pos[1].x-obj.pos[0].x);
-                self.tooltip.innerHTML = 'x: '+String(interpolate(obj.extra.p1.x, obj.extra.p2.x, t))+'<br />y: '+String(interpolate(obj.extra.p1.y, obj.extra.p2.y, t));
+                tip.style.left = 'auto';
+                tip.style.right = String(coords.pageX) + 'px';
             }
+            if ( coords.pageY+tip.clientHeight > document.html.clientHeight )
+            {
+                tip.style.top = 'auto';
+                tip.style.bottom = String(coords.pageY) + 'px';
+            }*/
         };
+        points = points.map(function(pt){ pt.y = vh-pt.y; return pt});
         for(i=0,n=points.length; i+1<n; i++)
         {
             if ( Point.isFinite(points[i]) && Point.isFinite(points[i+1]) )
@@ -2248,7 +2405,7 @@ Plot[PROTO] = {
         {
             if ( opts.axes.x && opts.axes.x.ticks && opts.axes.x.ticks.text && 0<opts.axes.x.ticks.text.size && (tx.length||txn.length) )
             {
-                t0 = (o.y >= padb) && (o.y <= vh-padt) ? o.y+5 : padb+5;
+                t0 = (o.y >= padt) && (o.y <= vh-padb) ? vh-o.y-5 : vh-padb-5;
                 ts = stdMath.ceil(tx.length/3);
                 for(i=0; i<tx.length; i+=ts)
                 {
@@ -2269,13 +2426,13 @@ Plot[PROTO] = {
                 for(i=0; i<ty.length; i+=ts)
                 {
                     if ( 0 === ty[i].v ) continue;
-                    self.renderer.drawText({x:t0, y:ty[i].y+2}, ty[i].v, opts.axes.y.ticks.text.size, opts.axes.y.ticks.text.color);
+                    self.renderer.drawText({x:t0, y:ty[i].y-2}, ty[i].v, opts.axes.y.ticks.text.size, opts.axes.y.ticks.text.color);
                 }
                 ts = stdMath.ceil(tyn.length/3);
                 for(i=0; i<tyn.length; i+=ts)
                 {
                     if ( 0 === tyn[i].v ) continue;
-                    self.renderer.drawText({x:t0, y:tyn[i].y+2}, tyn[i].v, opts.axes.y.ticks.text.size, opts.axes.y.ticks.text.color);
+                    self.renderer.drawText({x:t0, y:tyn[i].y-2}, tyn[i].v, opts.axes.y.ticks.text.size, opts.axes.y.ticks.text.color);
                 }
             }
         }
@@ -2319,7 +2476,7 @@ Plot[PROTO] = {
             pad2 = padr;
             if ( ticks && ticks.text && 0<ticks.text.size )
             {
-                ptext = padb+2;
+                ptext = vh-padb-2;
                 padb += 2*ticks.text.size;
             }
             bar = stdMath.max(1, (vh-padb-padt)/(n+spc*(n-1)));
@@ -2327,8 +2484,8 @@ Plot[PROTO] = {
         else
         {
             vs = vh;
-            pad1 = padb;
-            pad2 = padt;
+            pad1 = padt;
+            pad2 = padb;
             if ( ticks && ticks.text && 0<ticks.text.size )
             {
                 ptext = padl+2;
@@ -2374,13 +2531,13 @@ Plot[PROTO] = {
                     {
                         if ( pad1 <= t0 && t0 <= vs-pad2 )
                         {
-                            self.renderer.drawLine('hbar'===type?{y:padb, x:t0}:{x:padl, y:t0}, 'hbar'===type?{y:vh-padt, x:t0}:{x:vw-padr, y:t0}, ticks.size, ticks.color, ticks.style);
-                            v.push({p:t0, v:(n+i)*st});
+                            self.renderer.drawLine('hbar'===type?{y:padt, x:t0}:{x:padl, y:vh-t0}, 'hbar'===type?{y:vh-padb, x:t0}:{x:vw-padr, y:vh-t0}, ticks.size, ticks.color, ticks.style);
+                            v.push({p:'hbar'===type?t0:vh-t0, v:(n+i)*st});
                         }
                         if ( pad1 <= t0n && t0n <= vs-pad2 )
                         {
-                            self.renderer.drawLine('hbar'===type?{y:padb, x:t0n}:{x:padl, y:t0n}, 'hbar'===type?{y:vh-padt, x:t0n}:{x:vw-padr, y:t0n}, ticks.size, ticks.color, ticks.style);
-                            vn.push({p:t0n, v:(n+j)*st});
+                            self.renderer.drawLine('hbar'===type?{y:padt, x:t0n}:{x:padl, y:vh-t0n}, 'hbar'===type?{y:vh-padb, x:t0n}:{x:vw-padr, y:vh-t0n}, ticks.size, ticks.color, ticks.style);
+                            vn.push({p:'hbar'===type?t0n:vh-t0n, v:(n+j)*st});
                         }
                         t0 += ts; t0n -= ts; i++; j--;
                     }
@@ -2389,24 +2546,31 @@ Plot[PROTO] = {
         }
         points = points.map(function(pt){return vm.transform(pt);});
         evtHandler = function( type, obj, coords, evt ) {
+            var tip = self.tooltip;
             if ( 'enter' === type )
             {
-                self.tooltip.classList.remove('--plot-hide-tooltip');
-                self.tooltip.classList.add('--plot-show-tooltip');
-                self.tooltip.style.left = String(coords.pageX) + 'px';
-                self.tooltip.style.top = String(coords.pageY) + 'px';
-                self.tooltip.innerHTML = obj.extra.label+'<br />'+obj.extra.value;
+                tip.classList.remove('--plot-hide-tooltip');
+                tip.classList.add('--plot-show-tooltip');
+                tip.innerHTML = obj.extra.label + '<br />' + obj.extra.value;
             }
             else if ( 'leave' === type )
             {
-                self.tooltip.classList.remove('--plot-show-tooltip');
-                self.tooltip.classList.add('--plot-hide-tooltip');
+                tip.classList.remove('--plot-show-tooltip');
+                tip.classList.add('--plot-hide-tooltip');
+                return;
             }
-            else if ( 'move' === type )
+            tip.style.left = String(coords.pageX) + 'px';
+            tip.style.top = String(coords.pageY) + 'px';
+            /*if ( coords.pageX+tip.clientWidth > document.html.clientWidth )
             {
-                self.tooltip.style.left = String(coords.pageX) + 'px';
-                self.tooltip.style.top = String(coords.pageY) + 'px';
+                tip.style.left = 'auto';
+                tip.style.right = String(coords.pageX) + 'px';
             }
+            if ( coords.pageY+tip.clientHeight > document.html.clientHeight )
+            {
+                tip.style.top = 'auto';
+                tip.style.bottom = String(coords.pageY) + 'px';
+            }*/
         };
         if ( 'line'===type )
         {
@@ -2414,14 +2578,14 @@ Plot[PROTO] = {
             {
                 if ( Point.isFinite(points[i]) && Point.isFinite(points[i+1]) )
                 {
-                    self.renderer.drawLine({x:padl+ts, y:o+points[i].y}, {x:padl+ts+bar, y:o+points[i+1].y}, opts.line.size, opts.line.color, opts.line.style);
+                    self.renderer.drawLine({x:padl+ts, y:vh-o-points[i].y}, {x:padl+ts+bar, y:vh-o-points[i+1].y}, opts.line.size, opts.line.color, opts.line.style);
                 }
             }
             for(i=0,n=points.length,ts=0; i<n; i++,ts+=bar)
             {
                 if ( Point.isFinite(points[i]) )
                 {
-                    self.renderer.drawPoint({x:padl+ts, y:o+points[i].y}, opts.point.size, opts.colors[i], {
+                    self.renderer.drawPoint({x:padl+ts, y:vh-o-points[i].y}, opts.point.size, opts.colors[i], {
                             label: opts.labels[i],
                             value: String(data[i]),
                             listener: {
@@ -2441,9 +2605,9 @@ Plot[PROTO] = {
                 {
                     if ( 'hbar'===type )
                     {
-                        self.renderer.drawRect({y:padb+bar2+ts+(0<i?spc*ts:0), x:o+points[n-1-i].y/2}, {y:bar, x:stdMath.abs(points[n-1-i].y)}, 0, 0, 'transparent', 'solid', opts.colors[n-1-i], {
-                            label: opts.labels[n-1-i],
-                            value: String(data[n-1-i]),
+                        self.renderer.drawRect({y:padt+bar2+ts+(0<i?spc*ts:0), x:o+points[i].y/2}, {y:bar, x:stdMath.abs(points[i].y)}, 0, 0, 'transparent', 'solid', opts.colors[i], {
+                            label: opts.labels[i],
+                            value: String(data[i]),
                             listener: {
                                 'enter':evtHandler,
                                 'leave':evtHandler,
@@ -2453,7 +2617,7 @@ Plot[PROTO] = {
                     }
                     else
                     {
-                        self.renderer.drawRect({x:padl+bar2+ts+(0<i?spc*ts:0), y:o+points[i].y/2}, {x:bar, y:stdMath.abs(points[i].y)}, 0, 0, 'transparent', 'solid', opts.colors[i], {
+                        self.renderer.drawRect({x:padl+bar2+ts+(0<i?spc*ts:0), y:vh-o-points[i].y/2}, {x:bar, y:stdMath.abs(points[i].y)}, 0, 0, 'transparent', 'solid', opts.colors[i], {
                             label: opts.labels[i],
                             value: String(data[i]),
                             listener: {
@@ -2475,13 +2639,13 @@ Plot[PROTO] = {
                 for(i=0; i<v.length; i+=ts)
                 {
                     if ( 0 === v[i].v ) continue;
-                    self.renderer.drawText('hbar'===type?{x:v[i].p+2, y:t0}:{y:v[i].p+2, x:t0}, v[i].v, ticks.text.size, ticks.text.color);
+                    self.renderer.drawText('hbar'===type?{x:v[i].p+2, y:t0}:{y:v[i].p-2, x:t0}, v[i].v, ticks.text.size, ticks.text.color);
                 }
                 ts = stdMath.ceil(vn.length/3);
                 for(i=0; i<vn.length; i+=ts)
                 {
                     if ( 0 === vn[i].v ) continue;
-                    self.renderer.drawText('hbar'===type?{x:vn[i].p+2, y:t0}:{y:vn[i].p+2, x:t0}, vn[i].v, ticks.text.size, ticks.text.color);
+                    self.renderer.drawText('hbar'===type?{x:vn[i].p+2, y:t0}:{y:vn[i].p-2, x:t0}, vn[i].v, ticks.text.size, ticks.text.color);
                 }
             }
         }
