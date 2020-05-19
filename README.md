@@ -2,8 +2,10 @@
 
 `Plot.js`: Simple and small (45 Kb minified) *shape sketching* and *chart / functional graph plotting* library which can render to **Canvas**, **SVG** and **plain HTML**
 
+![Plot.js](/plot.jpg)
 
-[![Plot.js function graph](/screenshot.png)](https://foo123.github.io/examples/plot/graphs.html)
+
+[![Plot.js function graph](/function-graph.png)](https://foo123.github.io/examples/plot/graphs.html)
 
 ```javascript
 let canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), {
