@@ -60,6 +60,7 @@
     ;
 
     setTimeout(() => {
+    
         htmlPlot
             .clear()
             .line(knots, {line:{size:3, color:'#0000ff', style:'dotted'}})
@@ -68,6 +69,7 @@
             .rectangle({x:320,y:320}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {shape:{border:{size:1, color:'#00f000'}, fill:'#0000f0'}})
             .ellipse({x:250,y:300}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {shape:{border:{size:4, color:'#ffffff'}, fill:'#f00000'}})
             .arc({x:20,y:360}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,1/*largeArcFlag*/,1/*sweepFlag*/,{x:200,y:150}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+            .sector({x:320,y:50}/*center*/,60/*radius*/,20/*start angle deg*/,160/*end angle deg*/,{shape:{border:{size:2, color:'#ffffff'}, fill:'#0000f0'}})
         ;
         canvasPlot
             .clear()
@@ -77,6 +79,7 @@
             .rectangle({x:320,y:320}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {shape:{border:{size:1, color:'#00f000'}, fill:'#0000f0'}})
             .ellipse({x:250,y:300}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {shape:{border:{size:4, color:'#ffffff'}, fill:'#f00000'}})
             .arc({x:20,y:360}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,1/*largeArcFlag*/,1/*sweepFlag*/,{x:200,y:150}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+            .sector({x:320,y:50}/*center*/,60/*radius*/,20/*start angle deg*/,160/*end angle deg*/,{shape:{border:{size:2, color:'#ffffff'}, fill:'#0000f0'}})
         ;
         svgPlot
             .clear()
@@ -86,6 +89,7 @@
             .rectangle({x:320,y:320}/*center pt*/,{x:40,y:60}/*side*/,30/*rotation deg*/, {shape:{border:{size:1, color:'#00f000'}, fill:'#0000f0'}})
             .ellipse({x:250,y:300}/*center pt*/,{x:40,y:60}/*radius*/,60/*rotation deg*/, {shape:{border:{size:4, color:'#ffffff'}, fill:'#f00000'}})
             .arc({x:20,y:360}/*start pt*/,{x:10,y:20}/*radius*/,30/*rotation deg*/,1/*largeArcFlag*/,1/*sweepFlag*/,{x:200,y:150}/*end pt*/, {line:{size:2, color:'#ff00ff'}})
+            .sector({x:320,y:50}/*center*/,60/*radius*/,20/*start angle deg*/,160/*end angle deg*/,{shape:{border:{size:2, color:'#ffffff'}, fill:'#0000f0'}})
         ;
     }, 500);
 }();

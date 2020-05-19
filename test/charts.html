@@ -42,6 +42,9 @@
         padding: 12px 8px;
         margin: 8px auto;
     }
+    i {
+        font-size: 14px;
+    }
     #plot {
         position: relative;
         display: inline-block;
@@ -76,6 +79,8 @@
     <optgroup label="Chart Type">
         <option value="vbar" selected>Bar Chart Vertical</option>
         <option value="hbar">Bar Chart Horizontal</option>
+        <option value="pie">Pie Chart</option>
+        <option value="doughnut">Doughnut Chart</option>
         <option value="line">Line Chart</option>
     </optgroup>
 </select>
@@ -90,6 +95,7 @@
     </optgroup>
 </select>
 <button id="plot">Plot</button>
+<p><i>Note: hover over chart items to see further information</i></p>
 </div>
 
 <h2>== Html ==</h2>

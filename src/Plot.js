@@ -398,6 +398,41 @@ function svgArc2canvasArc( start, radius, xAxisRotation,
 
     return [centpX, centpY, xAxisRotation, sx, sy, rad, ang1, angd, sweepFlag];
 }
+/*function canvasArc2svgArc( center, radius, a0, a1, ccw )
+{
+    var pi = stdMath.PI,
+        tau = 2 * pi,
+        epsilon = EPS, //1e-6
+        tauEpsilon = tau - epsilon,
+        dx = radius * stdMath.cos(a0),
+        dy = radius * stdMath.sin(a1),
+        cw = ccw ? 0 : 1,
+        da = ccw ? a0 - a1 : a1 - a0,
+        start, rad, end
+    ;
+
+    start = {x:center.x+dx, y:center.y+dy};
+    rad = {x:radius, y:radius};
+
+    // Does the angle go the wrong way? Flip the direction.
+    if ( da < 0 ) da = (da % tau) + tau;
+
+    // Is this a complete circle? Draw two arcs to complete the circle.
+    if ( da > tauEpsilon )
+    {
+        end = {x:center.x-dx, y:center.y-dy};
+        return [
+            [start, rad, 0, 1, cw, end],
+            [end, rad, 0, 1, cw, start]
+        ];
+    }
+    else
+    {
+        // draw single arc
+        end = {x:center.x+radius*stdMath.cos(a1), y:center.x+radius*stdMath.sin(a1)};
+        return [[start, rad, 0, da >= pi, cw, end]];
+    }
+}*/
 
 function subdividePath( f, l, r, tolerance, depth, pl, pr )
 {
@@ -723,12 +758,15 @@ Renderer[PROTO] = {
     ,drawLine: err('Method not implemented!')
     ,drawRect: err('Method not implemented!')
     ,drawEllipse: err('Method not implemented!')
+    ,drawSector: err('Method not implemented!')
     ,drawArc: err('Method not implemented!')
     ,drawBezier: err('Method not implemented!')
     ,drawText: err('Method not implemented!')
+    ,drawLabel: err('Method not implemented!')
 };
 Renderer.handler = function( evt ) {
-    var self = this, pos, obj, onTop = (self.drawLayer === evt.target);
+    var self = this, pos, obj,
+        type = evt.type, onTop = (self.drawLayer === evt.target);
 
     function callListener( type, obj, pos, evt )
     {
@@ -747,13 +785,13 @@ Renderer.handler = function( evt ) {
 
     if ( onTop )
     {
-        if ( 'touchstart' === evt.type )
+        if ( 'touchstart' === type )
         {
             self.drawLayer.addEventListener('touchmove', self.handler, false);
             self.drawLayer.addEventListener('touchend', self.handler, false);
             self.drawLayer.addEventListener('touchcancel', self.handler, false);
         }
-        else if ( 'touchend' === evt.type || 'touchcancel' === evt.type )
+        else if ( 'touchend' === type || 'touchcancel' === type )
         {
             self.drawLayer.removeEventListener('touchmove', self.handler, false);
             self.drawLayer.removeEventListener('touchend', self.handler, false);
@@ -764,12 +802,12 @@ Renderer.handler = function( evt ) {
                 self.hitTarget = null;
             }
         }
-        else if ( 'mouseenter' === evt.type )
+        else if ( 'mouseenter' === type )
         {
             self.drawLayer.addEventListener('mouseleave', self.handler, false);
             self.drawLayer.addEventListener('mousemove', self.handler, false);
         }
-        else if ( 'mouseleave' === evt.type )
+        else if ( 'mouseleave' === type )
         {
             self.drawLayer.removeEventListener('mouseleave', self.handler, false);
             self.drawLayer.removeEventListener('mousemove', self.handler, false);
@@ -781,7 +819,7 @@ Renderer.handler = function( evt ) {
         }
     }
 
-    if ( 'touchmove' === evt.type || 'mousemove' === evt.type || 'click' === evt.type )
+    if ( 'touchmove' === type || 'mousemove' === type || 'click' === type )
     {
         pos = getMousePos(self.drawLayer, evt);
         obj = self.objAt(evt, pos);
@@ -795,7 +833,7 @@ Renderer.handler = function( evt ) {
                     callListener('leave', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
                     self.hitTarget = null;
                 }
-                else if ( 'click' !== evt.type )
+                else if ( 'click' !== type )
                 {
                     callListener('move', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
                 }
@@ -805,7 +843,7 @@ Renderer.handler = function( evt ) {
                 self.hitTarget = {obj:obj, pos:pos};
                 callListener('enter', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
             }
-            if ( 'click' === evt.type )
+            if ( 'click' === type )
             {
                 callListener('click', self.hitTarget.obj, self.hitTarget.pos=pos, evt);
             }
@@ -988,8 +1026,70 @@ Renderer.Html[PROTO] = extend(new Renderer(), {
         ellipse.style.transformOrigin = 'center center';
         ellipse.style.transform = 'rotate('+String((rotation||0)*stdMath.PI/180)+'rad)';
         ellipse.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
-        self.hitDict[ellipse.hitId] = {type:'ellipse', center:center, radius:radius, rotation:rotation, extrar:extra||null};
+        self.hitDict[ellipse.hitId] = {type:'ellipse', center:center, radius:radius, rotation:rotation, extra:extra||null};
         self.drawLayer.appendChild(ellipse);
+        return self;
+    }
+    ,drawSector: function( center, radius, a0, a1, lineSize, lineColor, lineStyle, fill, extra ) {
+        var self = this, p0, p1, da, dd, ra0, ra1,
+            x0, y0, x1, y1, cx, cy, clipPath, clipPoints = [],
+            sector = document.createElement('div');
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
+        if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
+            lineStyle = 'solid';
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
+        ra0 = a0*stdMath.PI/180;
+        ra1 = a1*stdMath.PI/180;
+        dd = 2*radius;
+        da = ra1-ra0;
+        cx = center.x; cy = center.y;
+        x0 = cx-radius; y0 = cy-radius;
+        x1 = cx+radius; y1 = cy+radius;
+        sector.className = '--plot-sector';
+        sector.style.position = 'absolute';
+        sector.style.display = 'inline-block';
+        sector.style.overflow = 'hidden';
+        sector.style.boxSizing = 'border-box';
+        sector.style.margin = '0px';
+        sector.style.padding = '0px';
+        sector.style.background = fill ? fill : 'none';
+        sector.style.width = String(dd)+'px';
+        sector.style.height = String(dd)+'px';
+        sector.style.border = 0 < lineSize ? String(lineSize)+'px '+lineStyle+' '+lineColor : 'none';
+        sector.style.borderRadius = '50%';
+        sector.style.left = String(x0)+'px';
+        sector.style.top = String(y0)+'px';
+        if ( da+EPS <= 2*stdMath.PI )
+        {
+            p0 = {x:x1, y:cy};
+            p1 = {x:cx+radius*stdMath.cos(da), y:cy+radius*stdMath.sin(da)};
+            clipPoints = p1.x < cx ? [
+                p0,
+                {x:cx, y:cy},
+                p1,
+                {x:x0, y:p1.y},
+                {x:x0, y:y1},
+                {x:p0.x, y:y1}
+            ] : [
+                p0,
+                {x:cx, y:cy},
+                p1,
+                {x:x1, y:y1}
+
+            ];
+            clipPath = 'polygon('+clipPoints.map(function(pt){return String(pt.x-x0)+'px '+String(pt.y-y0)+'px'}).join(',')+')';
+
+            sector.style.WebkitClipPath = 'border-box '+clipPath;
+            sector.style.clipPath = 'border-box '+clipPath;
+
+            sector.style.transformOrigin = 'center center';
+            sector.style.transform = 'rotate('+String(ra0)+'rad)';
+        }
+        sector.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
+        self.hitDict[sector.hitId] = {type:'sector', center:center, radius:radius, a0:a0, a1:a1, extra:extra||null};
+        self.drawLayer.appendChild(sector);
         return self;
     }
     ,drawArc: function( start, radius, xAxisRotation,
@@ -1411,6 +1511,61 @@ Renderer.Canvas[PROTO] = extend(new Renderer(), {
         ctx.resetTransform();
         return self;
     }
+    ,drawSector: function( center, radius, a0, a1, lineSize, lineColor, lineStyle, fill, extra ) {
+        var self = this, c, ra0, ra1, ctx = self.drawLayer.getContext('2d');
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
+        if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
+            lineStyle = 'solid';
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
+        ra0 = a0*stdMath.PI/180;
+        ra1 = a1*stdMath.PI/180;
+        ctx.resetTransform();
+        ctx.beginPath();
+        if ( 0 < lineSize )
+        {
+            if ( 'dashed' === lineStyle )
+                ctx.setLineDash([4, 4]); // dashed
+            else if ( 'dotted' === lineStyle )
+                ctx.setLineDash([2, 4]); // dotted
+            else
+                ctx.setLineDash([]); // solid
+            ctx.lineWidth = lineSize;
+            ctx.strokeStyle = lineColor;
+        }
+        ctx.moveTo(center.x, center.y);
+        ctx.arc(center.x, center.y, radius, ra0, ra1, false);
+        ctx.closePath();
+        if ( fill && 'none' !== fill )
+        {
+            ctx.fillStyle = fill;
+            ctx.fill()
+        }
+        if ( 0 < lineSize )
+            ctx.stroke();
+        ctx.resetTransform();
+
+        c = '#'+rgb2hex(self.nextColor = nextRGB(self.nextColor));
+        self.hitDict[c] = {type:'sector', center:center, radius:radius, a0:a0, a1:a1, extra:extra||null};
+        ctx = self.hitCanvas.getContext("2d");
+        ctx.resetTransform();
+        ctx.beginPath();
+        if ( 0 < lineSize )
+        {
+            ctx.lineWidth = lineSize;
+            ctx.strokeStyle = c;
+        }
+        ctx.moveTo(center.x, center.y);
+        ctx.arc(center.x, center.y, radius, ra0, ra1, false);
+        ctx.closePath();
+        ctx.fillStyle = c;
+        ctx.fill()
+        if ( 0 < lineSize )
+            ctx.stroke();
+        ctx.resetTransform();
+        return self;
+    }
     ,drawArc: function( start, radius, xAxisRotation,
                     largeArcFlag, sweepFlag, end,
                     lineSize, lineColor, lineStyle, extra
@@ -1732,6 +1887,46 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         self.drawLayer.appendChild(ellipse);
         return self;
     }
+    ,drawSector: function( center, radius, a0, a1, lineSize, lineColor, lineStyle, fill, extra ) {
+        var self = this, c, ra0, ra1, da, cx, cy, p0, p1, sector, hitId;
+        lineSize = null!=lineSize ? lineSize : self.opts.shape.border.size;
+        lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
+        lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
+        if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
+            lineStyle = 'solid';
+        fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
+        ra0 = a0*stdMath.PI/180; ra1 = a1*stdMath.PI/180;
+        da = ra1-ra0; cx = center.x; cy = center.y;
+        hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
+        if ( da+EPS > 2*stdMath.PI )
+        {
+            sector = document.createElementNS(self.NS,'ellipse');
+            sector.setAttribute('cx', String(cx));
+            sector.setAttribute('cy', String(cy));
+            sector.setAttribute('rx', String(radius));
+            sector.setAttribute('ry', String(radius));
+        }
+        else
+        {
+            p0 = {x:cx+radius, y:cy};
+            p1 = {x:cx+radius*stdMath.cos(da), y:cy+radius*stdMath.sin(da)};
+            sector = document.createElementNS(self.NS,'path');
+            sector.setAttribute('d', 'M '+String(cx)+' '+String(cy)+' L '+String(p0.x)+' '+String(p0.y)+' A '+String(radius)+' '+String(radius)+' 0 '+String(da>=stdMath.PI?1:0)+' 1 '+String(p1.x)+' '+String(p1.y)+' L '+String(cx)+' '+String(cy)+' Z');
+            sector.setAttribute('transform', 'rotate('+String(a0)+' '+String(cx)+' '+String(cy)+')');
+        }
+        sector.setAttribute('class', '--plot-sector');
+        sector.setAttribute('stroke-width', String(lineSize)+'px');
+        sector.setAttribute('stroke', lineColor);
+        sector.setAttribute('fill', fill);
+        if ( 'dashed' === lineStyle )
+            sector.setAttribute('stroke-dasharray', '4 4');
+        else if ( 'dotted' === lineStyle )
+            sector.setAttribute('stroke-dasharray', '2 4');
+        sector.hitId = hitId;
+        self.hitDict[sector.hitId] = {type:'sector', center:center, radius:radius, a0:a0, a1:a1, extra:extra||null};
+        self.drawLayer.appendChild(sector);
+        return self;
+    }
     ,drawArc: function( start, radius, xAxisRotation,
                     largeArcFlag, sweepFlag, end,
                     lineSize, lineColor, lineStyle, extra
@@ -1743,7 +1938,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-arc');
-        path.setAttribute('d', 'M '+String(start.x)+' '+String(start.y)+' A '+String(radius.x)+' '+String(radius.y)+' '+String(xAxisRotation||0)+' '+String(largeArcFlag?1:0)+' '+String(sweepFlag?1:0)+' '+String(end.x)+' '+String(end.y));
+        path.setAttribute('d', 'M '+String(start.x)+' '+String(start.y)+' A '+String(radius.x)+' '+String(radius.y)+' '+String(xAxisRotation||0)+' '+String(largeArcFlag?1:0)+' '+String(sweepFlag?1:0)+' '+String(end.x)+' '+String(end.y)/*+' Z'*/);
         path.setAttribute('stroke-width', String(lineSize)+'px');
         path.setAttribute('stroke', lineColor);
         path.setAttribute('fill', 'none');
@@ -1765,7 +1960,7 @@ Renderer.Svg[PROTO] = extend(new Renderer(), {
         if ( 'dashed' !== lineStyle && 'dotted' !== lineStyle )
             lineStyle = 'solid';
         path.setAttribute('class', '--plot-bezier');
-        path.setAttribute('d', 'M '+String(points[0].x)+','+String(points[0].y)+' C '+String(points[1].x)+','+String(points[1].y)+' '+String(points[2].x)+','+String(points[2].y)+' '+String(points[3].x)+','+String(points[3].y));
+        path.setAttribute('d', 'M '+String(points[0].x)+','+String(points[0].y)+' C '+String(points[1].x)+','+String(points[1].y)+' '+String(points[2].x)+','+String(points[2].y)+' '+String(points[3].x)+','+String(points[3].y)/*+' Z'*/);
         path.setAttribute('stroke-width', String(lineSize)+'px');
         path.setAttribute('stroke', lineColor);
         if ( 'dashed' === lineStyle )
@@ -2142,6 +2337,29 @@ Plot[PROTO] = {
         return self;
     }
 
+    ,sector: function( center, radius, startAngle, endAngle, opts ) {
+        var self = this;
+        self.renderer.init(); // lazy init
+        if ( 2 >= arguments.length && is_array(center) )
+        {
+            opts = extend(true, clone(self.opts), radius||{});
+            center.forEach(function(args){
+                opts = extend(true, opts, args[4]||{});
+                endAngle = args[3];
+                startAngle = args[2];
+                radius = args[1];
+                center = args[0];
+                self.renderer.drawSector(center, +radius, +startAngle, +endAngle, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
+            });
+        }
+        else
+        {
+            opts = extend(true, clone(self.opts), opts||{});
+            self.renderer.drawSector(center, +radius, +startAngle, +endAngle, opts.shape.border.size, opts.shape.border.color, opts.shape.border.style, opts.shape.fill);
+        }
+        return self;
+    }
+
     ,arc: function( start, radius, xAxisRotation,
                     largeArcFlag, sweepFlag, end, opts
     ) {
@@ -2442,10 +2660,11 @@ Plot[PROTO] = {
     ,chart: function( type, data, opts ) {
         var self = this, points, vw, vh, vm, s, o, min, range,
             t0, t0n, ts, v = [], vn = [], bar, bar2, sbar, spc = 0.2,
-            i, j, n, k, st, ticks, vs, pad1, pad2,
-            boundingBox, padl, padr, padt, padb, ptext, evtHandler;
+            i, j, n, k, st, ticks = null, vs, pad1, pad2, total = null,
+            boundingBox = null, padl, padr, padt, padb, ptext, evtHandler;
 
         type = String(type || 'vbar').toLowerCase();
+        if ( 'bar' === type ) type = 'vbar';
 
         opts = extend(true, clone(self.opts), opts||{});
 
@@ -2456,95 +2675,105 @@ Plot[PROTO] = {
         padt = stdMath.max(0, opts.padding ? opts.padding.top||0 : 0);
         padb = stdMath.max(0, opts.padding ? opts.padding.bottom||0 : 0);
 
-        if ( 'hbar'===type )
-            ticks = (opts.axes && opts.axes.x ? opts.axes.x.ticks : null) || null;
-        else
-            ticks = (opts.axes && opts.axes.y ? opts.axes.y.ticks : null) || null;
-
-        points = data.map(function(y, x){return new Point(x, y);});
-        boundingBox = self.boundingBox(points);
-        n = points.length;
+        n = data.length;
 
         self.renderer.init(); // lazy init
         vw = self.renderer.width();
         vh = self.renderer.height();
 
-        if ( 'hbar'===type )
+        if ( 'pie'===type || 'doughnut'===type )
         {
-            vs = vw;
-            pad1 = padl;
-            pad2 = padr;
-            if ( ticks && ticks.text && 0<ticks.text.size )
-            {
-                ptext = vh-padb-2;
-                padb += 2*ticks.text.size;
-            }
-            bar = stdMath.max(1, (vh-padb-padt)/(n+spc*(n-1)));
+            total = 0;
+            for(i=0; i<data.length; i++)
+                total += is_finite(data[i]) ? stdMath.abs(data[i]) : 0;
         }
         else
         {
-            vs = vh;
-            pad1 = padt;
-            pad2 = padb;
-            if ( ticks && ticks.text && 0<ticks.text.size )
-            {
-                ptext = padl+2;
-                padl += 2*ticks.text.size;
-            }
-            bar = 'line'===type ? stdMath.max(1, (vw-padl-padr)/(n)) : stdMath.max(1, (vw-padl-padr)/(n+spc*(n-1)));
-        }
-        min = 0>boundingBox.min.y ? -boundingBox.min.y : 0;
-        range = boundingBox.max.y+min;
-        s = (vs-pad1-pad2)/range;
-        o = pad1 + s*min;
-        bar2 = bar/2; //sbar = stdMath.max(1, spc*bar);
-        vm = new Matrix().scale(1, s);
+            if ( 'hbar'===type )
+                ticks = (opts.axes && opts.axes.x ? opts.axes.x.ticks : null) || null;
+            else if ( 'vbar'===type || 'line'===type )
+                ticks = (opts.axes && opts.axes.y ? opts.axes.y.ticks : null) || null;
 
-        if ( opts.axes )
-        {
-            if ( ticks )
+            points = data.map(function(y, x){return new Point(x, y);});
+            boundingBox = self.boundingBox(points);
+
+            if ( 'hbar'===type )
             {
-                st = 'auto' === ticks.step ? range/8 : ticks.step;
-                ts = stdMath.round(s*st);
-                if ( 0 < ts )
+                vs = vw;
+                pad1 = padl;
+                pad2 = padr;
+                if ( ticks && ticks.text && 0<ticks.text.size )
                 {
-                    t0 = o; n = 0;
-                    // t0 - n*ts <= v ==> n = stdMath.ceil((t0-v)/ts)
-                    if ( vs < t0 )
+                    ptext = vh-padb-2;
+                    padb += 2*ticks.text.size;
+                }
+                bar = stdMath.max(1, (vh-padb-padt)/(n+spc*(n-1)));
+            }
+            else
+            {
+                vs = vh;
+                pad1 = padt;
+                pad2 = padb;
+                if ( ticks && ticks.text && 0<ticks.text.size )
+                {
+                    ptext = padl+2;
+                    padl += 2*ticks.text.size;
+                }
+                bar = 'line'===type ? stdMath.max(1, (vw-padl-padr)/(n)) : stdMath.max(1, (vw-padl-padr)/(n+spc*(n-1)));
+            }
+            min = 0>boundingBox.min.y ? -boundingBox.min.y : 0;
+            range = boundingBox.max.y+min;
+            s = (vs-pad1-pad2)/range;
+            o = pad1 + s*min;
+            bar2 = bar/2; //sbar = stdMath.max(1, spc*bar);
+            vm = new Matrix().scale(1, s);
+            if ( opts.axes )
+            {
+                if ( ticks )
+                {
+                    st = 'auto' === ticks.step ? range/8 : ticks.step;
+                    ts = stdMath.round(s*st);
+                    if ( 0 < ts )
                     {
-                        k = stdMath.ceil((t0-vs)/ts);
-                        n -= k;
-                        t0 -= k*ts;
-                    }
-                    // t0 + n*ts >= 0 ==> n = stdMath.ceil(-t0/ts)
-                    if ( 0 > t0 )
-                    {
-                        k = stdMath.ceil(-t0/ts);
-                        n += k;
-                        t0 += k*ts;
-                    }
-                    i = t0===o ? 1 : 0;
-                    j = -1;
-                    t0n = t0+j*ts;
-                    t0 = t0+i*ts;
-                    while(t0 <= vs-pad2 || t0n >= pad1)
-                    {
-                        if ( pad1 <= t0 && t0 <= vs-pad2 )
+                        t0 = o; n = 0;
+                        // t0 - n*ts <= v ==> n = stdMath.ceil((t0-v)/ts)
+                        if ( vs < t0 )
                         {
-                            self.renderer.drawLine('hbar'===type?{y:padt, x:t0}:{x:padl, y:vh-t0}, 'hbar'===type?{y:vh-padb, x:t0}:{x:vw-padr, y:vh-t0}, ticks.size, ticks.color, ticks.style);
-                            v.push({p:'hbar'===type?t0:vh-t0, v:(n+i)*st});
+                            k = stdMath.ceil((t0-vs)/ts);
+                            n -= k;
+                            t0 -= k*ts;
                         }
-                        if ( pad1 <= t0n && t0n <= vs-pad2 )
+                        // t0 + n*ts >= 0 ==> n = stdMath.ceil(-t0/ts)
+                        if ( 0 > t0 )
                         {
-                            self.renderer.drawLine('hbar'===type?{y:padt, x:t0n}:{x:padl, y:vh-t0n}, 'hbar'===type?{y:vh-padb, x:t0n}:{x:vw-padr, y:vh-t0n}, ticks.size, ticks.color, ticks.style);
-                            vn.push({p:'hbar'===type?t0n:vh-t0n, v:(n+j)*st});
+                            k = stdMath.ceil(-t0/ts);
+                            n += k;
+                            t0 += k*ts;
                         }
-                        t0 += ts; t0n -= ts; i++; j--;
+                        i = t0===o ? 1 : 0;
+                        j = -1;
+                        t0n = t0+j*ts;
+                        t0 = t0+i*ts;
+                        while(t0 <= vs-pad2 || t0n >= pad1)
+                        {
+                            if ( pad1 <= t0 && t0 <= vs-pad2 )
+                            {
+                                self.renderer.drawLine('hbar'===type?{y:padt, x:t0}:{x:padl, y:vh-t0}, 'hbar'===type?{y:vh-padb, x:t0}:{x:vw-padr, y:vh-t0}, ticks.size, ticks.color, ticks.style);
+                                v.push({p:'hbar'===type?t0:vh-t0, v:(n+i)*st});
+                            }
+                            if ( pad1 <= t0n && t0n <= vs-pad2 )
+                            {
+                                self.renderer.drawLine('hbar'===type?{y:padt, x:t0n}:{x:padl, y:vh-t0n}, 'hbar'===type?{y:vh-padb, x:t0n}:{x:vw-padr, y:vh-t0n}, ticks.size, ticks.color, ticks.style);
+                                vn.push({p:'hbar'===type?t0n:vh-t0n, v:(n+j)*st});
+                            }
+                            t0 += ts; t0n -= ts; i++; j--;
+                        }
                     }
                 }
             }
+            points = points.map(function(pt){return vm.transform(pt);});
         }
-        points = points.map(function(pt){return vm.transform(pt);});
+
         evtHandler = function( type, obj, coords, evt ) {
             var tip = self.tooltip;
             if ( 'enter' === type )
@@ -2572,7 +2801,30 @@ Plot[PROTO] = {
                 tip.style.bottom = String(coords.pageY) + 'px';
             }*/
         };
-        if ( 'line'===type )
+        if ( 'pie'===type || 'doughnut'===type )
+        {
+            bar = 0.4*stdMath.min(vw, vh);
+            for(i=0,n=data.length,ts=0; i<n; i++)
+            {
+                if ( is_finite(data[i]) )
+                {
+                    st = stdMath.abs(data[i]);
+                    self.renderer.drawSector({x:vw/2, y:vh/2}, bar, 360*ts/total, 360*(ts+st)/total, 0, opts.line.color, 'solid', opts.colors[i], {
+                            label: opts.labels[i],
+                            value: String(st),
+                            listener: {
+                                'enter':evtHandler,
+                                'leave':evtHandler,
+                                'move':evtHandler
+                            }
+                        });
+                        ts += st;
+                }
+            }
+            if ( 'doughnut'===type )
+                self.renderer.drawEllipse({x:vw/2, y:vh/2}, {x:0.5*bar,y:0.5*bar}, 0, 0, opts.line.color, 'solid', opts.background.color);
+        }
+        else if ( 'line'===type )
         {
             for(i=0,n=points.length,ts=0; i+1<n; i++,ts+=bar)
             {
@@ -2630,9 +2882,9 @@ Plot[PROTO] = {
                 }
             }
         }
-        if ( opts.axes )
+        if ( opts.axes && ticks )
         {
-            if ( ticks && ticks.text && 0<ticks.text.size && (v.length||vn.length) )
+            if ( ticks.text && 0<ticks.text.size && (v.length||vn.length) )
             {
                 t0 = ptext;
                 ts = stdMath.ceil(v.length/3);
