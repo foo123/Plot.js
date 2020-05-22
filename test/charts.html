@@ -59,6 +59,8 @@
         color: #121212;
         text-align: left;
         font-size: 11px;
+        transform-origin: left top;
+        transform: translate(0, -50%);
     }
     .--plot-tooltip.--plot-hide-tooltip {
         display: none;
@@ -94,6 +96,15 @@
         <option value="100">100</option>
     </optgroup>
 </select>
+<select id="legend">
+    <optgroup label="Legend Position">
+        <option value="none">None</option>
+        <option value="top">Top</option>
+        <option value="bottom" selected>Bottom</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+    </optgroup>
+</select>
 <button id="plot">Plot</button>
 <p><i>Note: hover over chart items to see further information</i></p>
 </div>
@@ -121,14 +132,6 @@
         text:{
             size: 14
         },
-        label:{
-            padding:{
-                top: 20,
-                right: 10,
-                bottom: 20,
-                left: 10
-            }
-        },
         axes: {
                 x: {
                     color: '#000000',
@@ -149,8 +152,9 @@
 
         data = null,
         chartSelect = document.getElementById('chart'),
+        legendSelect = document.getElementById('legend'),
         dataSelect = document.getElementById('ndata'),
-        chartType = 'vbar', n = 20, text = 'A very very long long loooong text text text text..';
+        chartType = 'vbar', legend = 'bottom', n = 20
     ;
 
     function genData( n )
@@ -170,18 +174,15 @@
         {
             htmlPlot
                 .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
-                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
             ;
             canvasPlot
                 .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
-                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
             ;
             svgPlot
                 .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels})
-                .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
+                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
             ;
         }
     }
@@ -195,6 +196,7 @@
 
     document.getElementById('plot').addEventListener('click', ()=>{
         chartType = chartSelect.options[chartSelect.selectedIndex].value;
+        legend = legendSelect.options[legendSelect.selectedIndex].value;
         n = parseInt(dataSelect.options[dataSelect.selectedIndex].value);
         data = genData(n);
         plot();

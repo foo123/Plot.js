@@ -1,11 +1,11 @@
 # Plot.js
 
-`Plot.js`: Simple and small (45 Kb minified) *shape sketching* and *chart / functional graph plotting* library which can render to **Canvas**, **SVG** and **plain HTML**
+`Plot.js`: Simple and small (47kb minified) library which can *plot graphs of functions and various simple charts* and can render to **Canvas**, **SVG** and **plain HTML**
 
 ![Plot.js](/plot.jpg)
 
 
-[![Plot.js function graph](/function-graph.png)](https://foo123.github.io/examples/plot/graphs.html)
+[![Plot.js function graph](/function-graph.png)](https://foo123.github.io/examples/plot/)
 
 ```javascript
 let canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), {
@@ -35,28 +35,13 @@ canvasPlot
 ```
 
 
-[![Plot.js bar chart](/bar-chart.png)](https://foo123.github.io/examples/plot/charts.html)
+[![Plot.js bar chart](/bar-chart.png)](https://foo123.github.io/examples/plot/)
 
 
 ```javascript
 let htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), {
 background: {
         color: '#ffffff'
-    },
-    line: {
-        size: 1,
-        color: '#ff0000'
-    },
-    text:{
-        size: 14
-    },
-    label:{
-        padding:{
-            top: 20,
-            right: 10,
-            bottom: 20,
-            left: 10
-        }
     },
     axes: {
             x: {
@@ -70,11 +55,18 @@ background: {
         }
 });
 
-htmlPlot
-    .chart('vbar', data, {colors:colors, labels:labels})
-    .label({x:'right',y:'top'},{x:200,y:'auto'}, text, {label:{fill:'rgba(255,255,255,0.7)'}})
-;
+htmlPlot.chart('vbar', data, {colors:colors, labels:labels});
 ```
 
+[![Plot.js pie chart](/pie-chart.png)](https://foo123.github.io/examples/plot/)
 
-[![Plot.js shapes](/shapes.png)](https://foo123.github.io/examples/plot/shapes.html)
+
+```javascript
+let svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), {
+background: {
+        color: '#ffffff'
+    }
+});
+
+svgPlot.chart('pie', data, {colors:colors, labels:labels});
+```

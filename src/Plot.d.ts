@@ -1,7 +1,5 @@
 declare class Plot {
     constructor(renderer: any, opts: any);
-    arc(start: any, radius: any, xAxisRotation: any, largeArcFlag: any, sweepFlag: any, end: any, opts: any, ...args: any[]): any;
-    bezier(points: any, opts: any): any;
     boundingBox(points: any): any;
     chart(type: any, data: any, opts: any): any;
     clear(): any;
@@ -17,7 +15,6 @@ declare class Plot {
     resize(): any;
     sample(f: any, x0: any, x1: any, opts: any): any;
     sector(center: any, radius: any, startAngle: any, endAngle: any, opts: any, ...args: any[]): any;
-    spline(knots: any, opts: any): any;
     text(pos: any, text: any, opts: any): any;
     width(): any;
     static VERSION: string;
@@ -49,8 +46,6 @@ declare namespace Plot {
         clear(): void;
         defaultOpts(): any;
         dispose(): any;
-        drawArc(): void;
-        drawBezier(): void;
         drawEllipse(): void;
         drawLabel(): void;
         drawLine(): void;
@@ -72,15 +67,13 @@ declare namespace Plot {
             clear(): any;
             createText(str: any, textSize: any, textColor: any, maxWidth: any, lineHeight: any): any;
             dispose(): any;
-            drawArc(start: any, radius: any, xAxisRotation: any, largeArcFlag: any, sweepFlag: any, end: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
-            drawBezier(points: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawEllipse(center: any, radius: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawLabel(pos: any, size: any, txt: any, opts: any): any;
             drawLine(p1: any, p2: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawPoint(p: any, pointSize: any, pointColor: any, extra: any): any;
             drawRect(center: any, side: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawSector(center: any, radius: any, a0: any, a1: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
-            drawText(p: any, str: any, textSize: any, textColor: any, maxWidth: any): any;
+            drawText(p: any, txt: any, textSize: any, textColor: any, maxWidth: any): any;
             fitText(text: any, metricCtx: any, maxWidth: any, lineHeight: any): any;
             init(): any;
             objAt(evt: any, pos: any): any;
@@ -91,15 +84,13 @@ declare namespace Plot {
             background(background: any): any;
             clear(): any;
             createText(str: any, textSize: any, textColor: any, maxWidth: any, lineHeight: any): any;
-            drawArc(start: any, radius: any, xAxisRotation: any, largeArcFlag: any, sweepFlag: any, end: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
-            drawBezier(points: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawEllipse(center: any, radius: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawLabel(pos: any, size: any, txt: any, opts: any): any;
-            drawLine(p1: any, p2: any, lineSize: any, lineColor: any, lineStyle: any, extra: any, hitId: any): any;
+            drawLine(p1: any, p2: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawPoint(p: any, pointSize: any, pointColor: any, extra: any): any;
             drawRect(center: any, side: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawSector(center: any, radius: any, a0: any, a1: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
-            drawText(p: any, str: any, textSize: any, textColor: any, maxWidth: any): any;
+            drawText(p: any, txt: any, textSize: any, textColor: any, maxWidth: any): any;
             fitText(text: any, metricObj: any, maxWidth: any, lineHeight: any): any;
             init(): any;
             objAt(evt: any, pos: any): any;
@@ -109,15 +100,13 @@ declare namespace Plot {
             background(background: any): any;
             clear(): any;
             createText(str: any, textSize: any, textColor: any, maxWidth: any, lineHeight: any): any;
-            drawArc(start: any, radius: any, xAxisRotation: any, largeArcFlag: any, sweepFlag: any, end: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
-            drawBezier(points: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawEllipse(center: any, radius: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawLabel(pos: any, size: any, txt: any, opts: any): any;
             drawLine(p1: any, p2: any, lineSize: any, lineColor: any, lineStyle: any, extra: any): any;
             drawPoint(p: any, pointSize: any, pointColor: any, extra: any): any;
             drawRect(center: any, side: any, rotation: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
             drawSector(center: any, radius: any, a0: any, a1: any, lineSize: any, lineColor: any, lineStyle: any, fill: any, extra: any): any;
-            drawText(p: any, str: any, textSize: any, textColor: any, maxWidth: any): any;
+            drawText(p: any, txt: any, textSize: any, textColor: any, maxWidth: any): any;
             fitText(text: any, metricObj: any, maxWidth: any, lineHeight: any): any;
             init(): any;
             objAt(evt: any, pos: any): any;
