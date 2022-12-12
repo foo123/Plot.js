@@ -1,6 +1,9 @@
 # Plot.js
 
-`Plot.js`: Simple and small (47kb minified) library which can *plot graphs of functions and various simple charts* and can render to **Canvas**, **SVG** and **plain HTML**
+**Plot.js**: simple chart and function graph plotting library which can render to **Canvas**, **SVG** or **plain HTML**
+
+**46 kB minified**
+
 
 ![Plot.js](/plot.jpg)
 

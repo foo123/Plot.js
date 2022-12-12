@@ -90,8 +90,10 @@
     <optgroup label="#Inputs">
         <option value="2">2</option>
         <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="5">5</option>
         <option value="10">10</option>
-        <option value="20" selected>20</option>
+        <option value="20">20</option>
         <option value="50">50</option>
         <option value="100">100</option>
     </optgroup>
@@ -118,93 +120,94 @@
 
 <script>
 //<![CDATA[
-!function(){
-    document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
+!function() {
+"use strict";
+document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
 
-    var plotOptions = {
-        background: {
-            color: '#ffffff'
-        },
-        line: {
-            size: 1,
-            color: '#ff0000'
-        },
-        text:{
-            size: 14
-        },
-        axes: {
-                x: {
-                    color: '#000000',
-                    ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
-                },
-                y: {
-                    color: '#000000',
-                    ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
-                }
+var plotOptions = {
+    background: {
+        color: '#ffffff'
+    },
+    line: {
+        size: 1,
+        color: '#ff0000'
+    },
+    text:{
+        size: 14
+    },
+    axes: {
+            x: {
+                color: '#000000',
+                ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
+            },
+            y: {
+                color: '#000000',
+                ticks: {color: 'rgba(0,0,0,0.2)', step: 10}
             }
-        },
-
-        htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
-
-        canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
-
-        svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
-
-        data = null,
-        chartSelect = document.getElementById('chart'),
-        legendSelect = document.getElementById('legend'),
-        dataSelect = document.getElementById('ndata'),
-        chartType = 'vbar', legend = 'bottom', n = 20
-    ;
-
-    function genData( n )
-    {
-       var data = new Array(n), i, labels = new Array(n);
-       for(i=0; i<n; i++)
-       {
-            data[i] = (200*Math.random()-100)||1;
-            labels[i] = 'Entry: '+String(i+1);
         }
-       return {data:data, colors:Plot.Util.palette(n), labels:labels};
-    }
+    },
 
-    function plot( )
+    htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
+
+    canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
+
+    svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
+
+    data = null,
+    chartSelect = document.getElementById('chart'),
+    legendSelect = document.getElementById('legend'),
+    dataSelect = document.getElementById('ndata'),
+    chartType = 'vbar', legend = 'bottom', n = 4
+;
+
+function genData(n)
+{
+   var data = new Array(n), i, labels = new Array(n);
+   for (i=0; i<n; ++i)
+   {
+        data[i] = (200*Math.random()-100)||1;
+        labels[i] = 'Entry: '+String(i+1);
+    }
+   return {data:data, colors:Plot.Util.palette(n), labels:labels};
+}
+
+function plot()
+{
+    if (data && data.data)
     {
-        if ( data && data.data )
-        {
-            htmlPlot
-                .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
-            ;
-            canvasPlot
-                .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
-            ;
-            svgPlot
-                .clear()
-                .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
-            ;
-        }
+        htmlPlot
+            .clear()
+            .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
+        ;
+        canvasPlot
+            .clear()
+            .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
+        ;
+        svgPlot
+            .clear()
+            .chart(chartType, data.data, {colors:data.colors, labels:data.labels, legend:{position:legend}})
+        ;
     }
+}
 
-    window.addEventListener('resize', Plot.Util.debounce(()=>{
-        htmlPlot.resize();
-        canvasPlot.resize();
-        svgPlot.resize();
-        plot();
-    }, 400), false);
+window.addEventListener('resize', Plot.Util.debounce(() => {
+    htmlPlot.resize();
+    canvasPlot.resize();
+    svgPlot.resize();
+    plot();
+}, 400), false);
 
-    document.getElementById('plot').addEventListener('click', ()=>{
-        chartType = chartSelect.options[chartSelect.selectedIndex].value;
-        legend = legendSelect.options[legendSelect.selectedIndex].value;
-        n = parseInt(dataSelect.options[dataSelect.selectedIndex].value);
-        data = genData(n);
-        plot();
-    }, false);
-
-    // run on load
+document.getElementById('plot').addEventListener('click', () => {
+    chartType = chartSelect.options[chartSelect.selectedIndex].value;
+    legend = legendSelect.options[legendSelect.selectedIndex].value;
+    n = parseInt(dataSelect.options[dataSelect.selectedIndex].value);
     data = genData(n);
-    setTimeout(plot, 500);
+    plot();
+}, false);
+
+// run on load
+data = genData(n);
+setTimeout(plot, 500);
 }();
 //]]>
 </script>

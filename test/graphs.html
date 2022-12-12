@@ -108,91 +108,92 @@
 <script>
 //<![CDATA[
 !function(){
-    document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
+"use strict";
+document.getElementById('ver').innerHTML = 'v.'+Plot.VERSION;
 
-    var plotOptions = {
-            background: {
-                color: '#ffffff'
-            },
-            line:{
-                size: 3,
-                color: '#ff0000'
-            },
-            axes: {
-                x: {
-                    color: '#000000',
-                    ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
-                },
-                y: {
-                    color: '#000000',
-                    ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
-                }
-            }
+var plotOptions = {
+        background: {
+            color: '#ffffff'
         },
-
-        htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
-
-        canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
-
-        svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
-
-        points = null, fStr = ''
-    ;
-    function plot( reset )
-    {
-        if ( reset || !points )
-        {
-            points = null;
-            fStr = document.getElementById('f').value.trim();
-
-            const range = [parseFloat(document.getElementById('from').value), parseFloat(document.getElementById('to').value)];
-            let f = null;
-
-            try {
-                f = new Function("x", "\"use strict\";\nreturn ("+fStr.replace(/[a-zA-Z]+\(/g, m => 'Math.'+m)+");");
-            } catch(e) {
-                console.error(e.toString());
-                f = null;
-            }
-            if ( ("function" === typeof f) &&
-                isFinite(range[0]) && isFinite(range[1]) )
-            {
-                 // cache plot samples to avoid recomputation time
-                points = htmlPlot.sample(f, range[0], range[1]);
+        line:{
+            size: 3,
+            color: '#ff0000'
+        },
+        axes: {
+            x: {
+                color: '#000000',
+                ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
+            },
+            y: {
+                color: '#000000',
+                ticks: {color: 'rgba(0,0,0,0.5)', step: 0.5}
             }
         }
+    },
 
-        if ( points && points.length )
+    htmlPlot = Plot(Plot.Renderer.Html(document.getElementById('container-html')), plotOptions),
+
+    canvasPlot = Plot(Plot.Renderer.Canvas(document.getElementById('container-canvas')), plotOptions),
+
+    svgPlot = Plot(Plot.Renderer.Svg(document.getElementById('container-svg')), plotOptions),
+
+    points = null, fStr = ''
+;
+function plot(reset)
+{
+    if (reset || !points)
+    {
+        points = null;
+        fStr = document.getElementById('f').value.trim();
+
+        const range = [parseFloat(document.getElementById('from').value), parseFloat(document.getElementById('to').value)];
+        let f = null;
+
+        try {
+            f = new Function("x", "\"use strict\";\nreturn ("+fStr.replace(/[a-zA-Z]+\(/g, m => 'Math.'+m)+");");
+        } catch(e) {
+            console.error(e.toString());
+            f = null;
+        }
+        if (("function" === typeof f) &&
+            isFinite(range[0]) && isFinite(range[1]))
         {
-            htmlPlot
-                .clear()
-                .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
-            ;
-            canvasPlot
-                .clear()
-                .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
-            ;
-            svgPlot
-                .clear()
-                .graph(points) // .graph(f, range[0], range[1]); // same
-                .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
-            ;
+             // cache plot samples to avoid recomputation time
+            points = htmlPlot.sample(f, range[0], range[1]);
         }
     }
 
-    document.getElementById('plot').addEventListener('click', ()=>plot(true), false);
+    if (points && points.length)
+    {
+        htmlPlot
+            .clear()
+            .graph(points) // .graph(f, range[0], range[1]); // same
+            .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
+        ;
+        canvasPlot
+            .clear()
+            .graph(points) // .graph(f, range[0], range[1]); // same
+            .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
+        ;
+        svgPlot
+            .clear()
+            .graph(points) // .graph(f, range[0], range[1]); // same
+            .label({x:'right',y:'top'},{x:'auto',y:'auto'}, 'f(x) = '+fStr, {label:{border:{size:0},fill:'rgba(255,255,255,0.7)',text:{size:20}}})
+        ;
+    }
+}
 
-    window.addEventListener('resize', Plot.Util.debounce(()=>{
-        htmlPlot.resize();
-        canvasPlot.resize();
-        svgPlot.resize();
-        plot();
-    }, 400), false);
+document.getElementById('plot').addEventListener('click', () => plot(true), false);
 
-    // run on load
-    setTimeout(plot, 500);
+window.addEventListener('resize', Plot.Util.debounce(() => {
+    htmlPlot.resize();
+    canvasPlot.resize();
+    svgPlot.resize();
+    plot();
+}, 400), false);
+
+// run on load
+setTimeout(plot, 500);
 }();
 //]]>
 </script>
