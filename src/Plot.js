@@ -485,7 +485,7 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
     ,drawLine: function(p1, p2, lineSize, lineColor, lineStyle, extra) {
         var self = this, line = document.createElement('div'),
             dy = p2.y - p1.y, dx = p2.x - p1.x, dd = stdMath.hypot(dy, dx);
-        lineSize = null != lineSize ? lineSize : self.opts.line.size;
+        lineSize = (null != lineSize ? lineSize : self.opts.line.size) || 0;
         lineColor = String(lineColor || self.opts.line.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.line.style).toLowerCase();
         if ('dashed' !== lineStyle && 'dotted' !== lineStyle)
@@ -503,7 +503,7 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         line.style.height = '0px';
         line.style.borderBottom = String(lineSize)+'px '+lineStyle+' '+lineColor;
         line.style.left = String(p1.x)+'px';
-        line.style.top = String(p1.y)+'px';
+        line.style.top = String(p1.y - lineSize/2)+'px';
         line.style.transformOrigin = 'left top';
         line.style.transform = 'rotate('+String(stdMath.atan2(dy, dx))+'rad)';
         line.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -512,13 +512,15 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         return self;
     }
     ,drawRect: function(center, side, rotation, lineSize, lineColor, lineStyle, fill, extra) {
-        var self = this, rect = document.createElement('div');
-        lineSize = null != lineSize ? lineSize : self.opts.shape.border.size;
+        var self = this, rect = document.createElement('div'), w, h;
+        lineSize = (null != lineSize ? lineSize : self.opts.shape.border.size) || 0;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ('dashed' !== lineStyle && 'dotted' !== lineStyle)
             lineStyle = 'solid';
         fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
+        w = side.x - lineSize;
+        h = side.y - lineSize;
         rect.className = '--plot-rectangle';
         rect.style.position = 'absolute';
         rect.style.display = 'inline-block';
@@ -527,11 +529,11 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         rect.style.margin = '0px';
         rect.style.padding = '0px';
         rect.style.background = fill ? fill : 'none';
-        rect.style.width = String(side.x)+'px';
-        rect.style.height = String(side.y)+'px';
+        rect.style.width = String(w)+'px';
+        rect.style.height = String(h)+'px';
         rect.style.border = 0 < lineSize ? String(lineSize)+'px '+lineStyle+' '+lineColor : 'none';
-        rect.style.left = String(center.x-side.x/2)+'px';
-        rect.style.top = String(center.y-side.y/2)+'px';
+        rect.style.left = String(center.x - w/2)+'px';
+        rect.style.top = String(center.y - h/2)+'px';
         rect.style.transformOrigin = 'center center';
         rect.style.transform = 'rotate('+String(rad(rotation || 0))+'rad)';
         rect.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -540,13 +542,15 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         return self;
     }
     ,drawEllipse: function(center, radius, rotation, lineSize, lineColor, lineStyle, fill, extra) {
-        var self = this, ellipse = document.createElement('div');
-        lineSize = null != lineSize ? lineSize : self.opts.shape.border.size;
+        var self = this, ellipse = document.createElement('div'), w, h;
+        lineSize = (null != lineSize ? lineSize : self.opts.shape.border.size) || 0;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ('dashed' !== lineStyle && 'dotted' !== lineStyle)
             lineStyle = 'solid';
         fill = String(null != fill ? fill : self.opts.shape.fill).toLowerCase();
+        w = 2*radius.x - lineSize;
+        h = 2*radius.y - lineSize;
         ellipse.className = '--plot-ellipse';
         ellipse.style.position = 'absolute';
         ellipse.style.display = 'inline-block';
@@ -555,12 +559,12 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         ellipse.style.margin = '0px';
         ellipse.style.padding = '0px';
         ellipse.style.background = fill ? fill : 'none';
-        ellipse.style.width = String(2*radius.x)+'px';
-        ellipse.style.height = String(2*radius.y)+'px';
+        ellipse.style.width = String(w)+'px';
+        ellipse.style.height = String(h)+'px';
         ellipse.style.border = 0 < lineSize ? String(lineSize)+'px '+lineStyle+' '+lineColor : 'none';
         ellipse.style.borderRadius = '50%';
-        ellipse.style.left = String(center.x - radius.x)+'px';
-        ellipse.style.top = String(center.y - radius.y)+'px';
+        ellipse.style.left = String(center.x - w/2)+'px';
+        ellipse.style.top = String(center.y - h/2)+'px';
         ellipse.style.transformOrigin = 'center center';
         ellipse.style.transform = 'rotate('+String(rad(rotation || 0))+'rad)';
         ellipse.hitId = rgb2hex(self.nextColor = nextRGB(self.nextColor));
@@ -572,7 +576,7 @@ Renderer.Html[PROTO] = extend(Object.create(Renderer[PROTO]), {
         var self = this, p0, p1, da, dd, ra0, ra1,
             x0, y0, x1, y1, cx, cy, clipPath, clipPoints = [],
             sector = document.createElement('div');
-        lineSize = null != lineSize ? lineSize : self.opts.shape.border.size;
+        lineSize = (null != lineSize ? lineSize : self.opts.shape.border.size) || 0;
         lineColor = String(lineColor || self.opts.shape.border.color).toLowerCase();
         lineStyle = String(lineStyle || self.opts.shape.border.style).toLowerCase();
         if ('dashed' !== lineStyle && 'dotted' !== lineStyle)
